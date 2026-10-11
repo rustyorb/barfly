@@ -16,3 +16,4 @@ voice/.uv-cache/
 voice/.uv-python/
 voice/voices/*
 !voice/voices/.gitkeep
+__pycache__/
