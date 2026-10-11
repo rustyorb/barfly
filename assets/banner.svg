@@ -1,0 +1,61 @@
+<svg width="1200" height="280" viewBox="0 0 1200 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Barfly — the one simulated fruit fly nobody experiments on">
+  <!-- Self-contained on purpose: GitHub's camo proxy strips external refs. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#120b07"/>
+      <stop offset="0.55" stop-color="#1a100a"/>
+      <stop offset="1" stop-color="#0b0705"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="0.24" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f0a63a" stop-opacity="0.30"/>
+      <stop offset="0.45" stop-color="#f0a63a" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f0a63a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="street" cx="1" cy="0.6" r="0.5">
+      <stop offset="0" stop-color="#7fb2e6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#7fb2e6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f0a63a" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#f0a63a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#f0a63a" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="neon" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="280" fill="url(#bg)"/>
+  <rect width="1200" height="280" fill="url(#lamp)"/>
+  <rect width="1200" height="280" fill="url(#street)"/>
+
+  <!-- the counter -->
+  <rect x="0" y="232" width="1200" height="48" fill="#3b2113"/>
+  <rect x="0" y="232" width="1200" height="3" fill="#f0a63a" fill-opacity="0.35"/>
+
+  <!-- the sign -->
+  <rect x="72" y="52" width="470" height="118" fill="#2a0d0a" stroke="#b3261c" stroke-width="7"/>
+  <text x="307" y="140" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="88" font-weight="700" fill="#ffd68a" letter-spacing="6" filter="url(#neon)">BARFLY</text>
+
+  <!-- tagline -->
+  <rect x="74" y="190" width="420" height="2" fill="url(#rule)"/>
+  <text x="74" y="218" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-style="italic" fill="#b39a74">The one simulated fruit fly nobody experiments on.</text>
+
+  <!-- the mug -->
+  <g transform="translate(900 150)">
+    <rect x="0" y="0" width="64" height="82" rx="4" fill="#e09a22"/>
+    <rect x="0" y="-8" width="64" height="14" rx="6" fill="#fff6dd"/>
+    <rect x="0" y="0" width="64" height="82" rx="4" fill="none" stroke="#e8f4f8" stroke-opacity="0.75" stroke-width="3"/>
+    <path d="M 64 18 C 96 18 96 62 64 62" fill="none" stroke="#e8f4f8" stroke-opacity="0.75" stroke-width="6"/>
+  </g>
+
+  <!-- the smoke -->
+  <path d="M 1040 232 C 1020 190 1066 168 1042 128 C 1024 98 1062 78 1048 44" fill="none" stroke="#cfd6e2" stroke-opacity="0.35" stroke-width="5" stroke-linecap="round"/>
+  <rect x="1012" y="226" width="56" height="6" rx="3" fill="#f3efe6"/>
+  <circle cx="1070" cy="229" r="4" fill="#ff6a1f"/>
+
+  <!-- the card -->
+  <text x="1128" y="64" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="19" fill="#f0a63a">His drink is real wiring.</text>
+  <text x="1128" y="90" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="19" fill="#f0a63a">His mouth is not.</text>
+</svg>

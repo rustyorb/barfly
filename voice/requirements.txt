@@ -1,0 +1,4 @@
+# Install the GPU build of PyTorch first (see the README), then: pip install -r requirements.txt
+chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git
+fastapi
+uvicorn

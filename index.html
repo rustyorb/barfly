@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Barfly</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="bar" aria-label="A fruit fly sitting at a bar"></canvas>
+
+    <div id="loading">
+      <p id="loading-stage">Waking him up</p>
+      <div class="track"><div id="loading-bar"></div></div>
+    </div>
+
+    <aside id="panel" hidden>
+      <p class="card">His drink is real wiring.<br />His mouth is not.</p>
+
+      <dl class="meters">
+        <div>
+          <dt>Sugar on his tongue <span class="tag ours">we do this</span></dt>
+          <dd><span class="bar"><i id="m-sugar"></i></span><b id="v-sugar">0</b></dd>
+        </div>
+        <div>
+          <dt>Mouth motor neurons <span class="tag his">he does this</span></dt>
+          <dd><span class="bar"><i id="m-mouth"></i></span><b id="v-mouth">0</b></dd>
+        </div>
+        <div>
+          <dt>Something looming <span class="tag ours">we do this</span></dt>
+          <dd><span class="bar"><i id="m-loom"></i></span><b id="v-loom">0</b></dd>
+        </div>
+        <div>
+          <dt>Escape neurons <span class="tag his">he does this</span></dt>
+          <dd><span class="bar"><i id="m-escape"></i></span><b id="v-escape">0</b></dd>
+        </div>
+        <div>
+          <dt>Buzz <span class="tag made">we made this up</span></dt>
+          <dd><span class="bar"><i id="m-buzz"></i></span><b id="v-buzz">0%</b></dd>
+        </div>
+        <div>
+          <dt>Inhibition, whole brain <span class="tag made">the buzz does this</span></dt>
+          <dd><span class="note">every GABA connection</span><b id="v-gaba">x1.00</b></dd>
+        </div>
+      </dl>
+
+      <p class="tab">Tab: <b id="tab">0</b> <span id="tab-unit">beers</span></p>
+
+      <h2>What he did</h2>
+      <ol id="log"></ol>
+
+      <p class="fine" id="fine"></p>
+    </aside>
+
+    <section id="dock" hidden>
+      <ol id="chat" aria-live="polite"></ol>
+      <form id="say">
+        <input id="say-text" type="text" autocomplete="off" placeholder="Say something to him" aria-label="Say something to him" />
+        <button type="submit">Say</button>
+      </form>
+      <div class="row">
+        <button id="pour" type="button">Pour him one</button>
+        <button id="door" type="button">Bang the door</button>
+        <button id="open-settings" type="button" class="quiet">Settings</button>
+      </div>
+      <div class="row settings">
+        <span id="mouth-summary"></span>
+      </div>
+    </section>
+
+    <dialog id="settings" aria-labelledby="set-title">
+      <h2 id="set-title">Settings</h2>
+
+      <h3>His words</h3>
+      <p class="help">A language model writes what he says. It is told what his body just did; it never touches his brain.</p>
+      <label class="field">Provider <select id="set-provider"></select></label>
+      <label class="field" id="set-key-row" hidden
+        >API key <input id="set-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the key, then press Tab"
+      /></label>
+      <p class="help" id="set-cloud-note" hidden>
+        The key is stored in this browser only. With this provider, what you type and the note about his body are sent to that company.
+      </p>
+      <div class="field">
+        <label for="set-model">Model</label>
+        <span class="inline"><select id="set-model"></select><button id="set-refresh" type="button" class="quiet">Refresh</button></span>
+      </div>
+      <p class="help" id="set-status" aria-live="polite"></p>
+
+      <h3>His voice</h3>
+      <label class="field">Voice <select id="set-voice"></select></label>
+      <p class="help" id="set-voice-note"></p>
+
+      <h3>Who he is</h3>
+      <p class="help">This is his whole character. Rewrite it however you like; it is saved as you type and used from his next line.</p>
+      <textarea id="set-persona" rows="14" spellcheck="true" aria-label="His persona"></textarea>
+      <div class="row">
+        <button id="set-persona-reset" type="button" class="quiet">Put the first draft back</button>
+        <button id="set-close" type="button">Done</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

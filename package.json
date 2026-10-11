@@ -1,0 +1,24 @@
+{
+  "name": "barfly",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Barfly: the one simulated fruit fly nobody experiments on. A whole fly brain at a bar.",
+  "scripts": {
+    "dev": "vite",
+    "data": "uv run scripts/build_data.py",
+    "probe:drunk": "node scripts/drunk-probe.ts",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}
