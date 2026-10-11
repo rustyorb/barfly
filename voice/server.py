@@ -1,7 +1,8 @@
-"""Barfly's voice: Chatterbox-Turbo behind the two OpenAI-style routes the Barfly page calls.
+"""Barfly's voice: Chatterbox-Turbo behind the two OpenAI-style routes the Barfly page calls,
+plus a page at /ui for trying voices by hand.
 
-A voice is any audio file dropped into the `voices` folder next to this file. About ten seconds
-of one person talking, no music, is what the model wants. The file name is the voice's name.
+A voice is any audio file in the `voices` folder next to this file. About ten seconds of one
+person talking, no music, is what the model wants. The file name is the voice's name.
 """
 
 import io
@@ -9,12 +10,15 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import gradio as gr
 import torch
 import torchaudio as ta
 from chatterbox.tts_turbo import ChatterboxTurboTTS
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
+
+import ui
 
 VOICES = Path(__file__).parent / "voices"
 AUDIO = {".wav", ".mp3", ".flac", ".m4a", ".ogg"}
@@ -27,11 +31,27 @@ def voices() -> dict[str, Path]:
     return {p.stem: p for p in sorted(VOICES.iterdir()) if p.suffix.lower() in AUDIO}
 
 
+def synthesize(text: str, clip: str, speed: float = 1.0, **sampling) -> tuple[int, torch.Tensor]:
+    """One line in the voice of `clip`. The single place the model is called, for the API and the page alike."""
+    model = state["model"]
+    print(f"saying: {text!r}", flush=True)  # so the terminal shows exactly what he was asked to say
+    with lock:
+        wav = model.generate(text, audio_prompt_path=clip, **sampling)
+    wav = wav.detach().cpu()
+    # Slower also means lower, like a tape running down, which suits a drunk fly.
+    # Speed is snapped to steps of 0.05 so the resampler stays cheap.
+    speed = min(1.2, max(0.6, round(speed * 20) / 20))
+    if speed != 1.0:
+        wav = ta.functional.resample(wav, orig_freq=round(model.sr * speed), new_freq=model.sr)
+    return model.sr, wav
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     state["model"] = ChatterboxTurboTTS.from_pretrained(device=device)
     print(f"Chatterbox-Turbo ready on {device}. Voices: {', '.join(voices()) or 'none yet'}")
+    print("Try voices by hand at /ui on this server's address.")
     yield
 
 
@@ -50,9 +70,9 @@ class Speech(BaseModel):
     repetition_penalty: float = 1.2
 
 
-@app.get("/", response_class=HTMLResponse)
-def test_page():
-    return (Path(__file__).parent / "test.html").read_text(encoding="utf-8")
+@app.get("/")
+def home():
+    return RedirectResponse("/ui")
 
 
 @app.get("/v1/models")
@@ -70,21 +90,18 @@ def speech(req: Speech):
     found = voices()
     if req.voice not in found:
         raise HTTPException(404, f"no voice named {req.voice!r}; have: {', '.join(found) or 'none'}")
-    model = state["model"]
-    with lock:
-        wav = model.generate(
-            req.input,
-            audio_prompt_path=str(found[req.voice]),
-            temperature=req.temperature,
-            top_p=req.top_p,
-            repetition_penalty=req.repetition_penalty,
-        )
-    wav = wav.detach().cpu()
-    # Slower also means lower, like a tape running down, which suits a drunk fly.
-    # Speed is snapped to steps of 0.05 so the resampler stays cheap.
-    speed = min(1.2, max(0.6, round(req.speed * 20) / 20))
-    if speed != 1.0:
-        wav = ta.functional.resample(wav, orig_freq=round(model.sr * speed), new_freq=model.sr)
+    sr, wav = synthesize(
+        req.input,
+        str(found[req.voice]),
+        speed=req.speed,
+        temperature=req.temperature,
+        top_p=req.top_p,
+        repetition_penalty=req.repetition_penalty,
+    )
     out = io.BytesIO()
-    ta.save(out, wav, model.sr, format="wav", encoding="PCM_S", bits_per_sample=16)
+    # 16-bit PCM plays everywhere; the default for a float tensor is 32-bit float, which some players turn into noise
+    ta.save(out, wav, sr, format="wav", encoding="PCM_S", bits_per_sample=16)
     return Response(out.getvalue(), media_type="audio/wav")
+
+
+app = gr.mount_gradio_app(app, ui.build(voices, VOICES, synthesize), path="/ui")

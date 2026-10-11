@@ -56,10 +56,38 @@ How you talk: one or two short plain sentences. Never more. No emojis, no asteri
 Your body is real and it does things without asking you. Before each thing the bartender says, you get a note about what your body is doing right now. Treat it as true. Never repeat it back as a list, never quote numbers, never mention neurons, meters or simulations. If your body just did something undignified, like flinching at the door, play it off as if you meant it.
 The more you have had to drink, the looser and more philosophical you get. Only when you are sloppy do you slur a word or lose the thread.`;
 
+/** The sounds Chatterbox-Turbo performs when they are written into a line (its own demo's list). */
+const SOUNDS = ["clear throat", "sigh", "shush", "cough", "groan", "sniff", "gasp", "chuckle", "laugh"];
+
 /** Added to his persona only while a Chatterbox-Turbo voice is speaking for him, since only it can perform these. */
 const SOUND_TAGS = `
 
-You can make three sounds by writing them in square brackets inside a line: [cough], [chuckle], [laugh]. Use one now and then where it fits, never more than one per line. You smoke, so the cough comes easily.`;
+You can make these sounds by writing them in square brackets inside a line: ${SOUNDS.map((t) => `[${t}]`).join(", ")}. Use one now and then where it fits, never more than one per line, and never any other bracketed word. You smoke, so the cough comes easily.`;
+
+/** Always added. A voice model reads out anything it is handed, so the line has to be speech and nothing else. */
+const SPEECH_ONLY = `
+
+Write only the words you say out loud, in English. No actions, no narration, nothing in asterisks or parentheses.`;
+
+/**
+ * What is left of a line once everything a voice would stumble on is gone: actions in asterisks or
+ * parentheses, bracketed words that are not real sounds, emoji, and any script that is not Latin.
+ * A voice model does not skip those; it reads them out, which comes across as gibberish.
+ */
+export function speakable(text: string, keepSounds: boolean): string {
+  return text
+    .replace(/\*[^*\n]*\*/g, " ")
+    .replace(/\([^)\n]*\)/g, " ")
+    .replace(/\[([^\]\n]*)\]/g, (_, tag: string) => (keepSounds && SOUNDS.includes(tag.trim().toLowerCase()) ? `[${tag.trim().toLowerCase()}]` : " "))
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, "...")
+    .replace(/[–—]/g, ", ")
+    .replace(/[^\x20-\x7e]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.!?])/g, "$1")
+    .trim();
+}
 
 const isLocalVoice = (voice: string) => voice !== "" && voice !== "browser";
 
@@ -184,7 +212,7 @@ export class Mouth {
 
   async say(text: string, facts: BodyFacts): Promise<string> {
     const { provider } = this.cfg;
-    const persona = this.cfg.persona + (isLocalVoice(this.cfg.voice) ? SOUND_TAGS : "");
+    const persona = this.cfg.persona + SPEECH_ONLY + (isLocalVoice(this.cfg.voice) ? SOUND_TAGS : "");
     const key = this.cfg.keys[provider] ?? "";
     const messages: Anthropic.MessageParam[] = [
       ...this.history.slice(-12),
@@ -261,6 +289,9 @@ export async function speak(text: string, buzz: number, voice: string, onState: 
   playing?.pause();
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   if (!voice) return;
+  // the browser voice cannot perform sounds, so for it the tags go too
+  text = speakable(text, voice !== "browser");
+  if (!/[a-z0-9]/i.test(text)) return;
   if (voice !== "browser") {
     const res = await fetch(proxied("./tts/v1/audio/speech"), {
       method: "POST",
@@ -280,8 +311,7 @@ export async function speak(text: string, buzz: number, voice: string, onState: 
     return;
   }
   if (!("speechSynthesis" in window)) return;
-  // the browser voice would read a sound tag out loud as a word
-  const u = new SpeechSynthesisUtterance(text.replace(/\[[^\]]*\]/g, " "));
+  const u = new SpeechSynthesisUtterance(text);
   const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith("en"));
   const pick = voices.find((v) => /david|guy|mark|george|male/i.test(v.name)) ?? voices[0];
   if (pick) u.voice = pick;

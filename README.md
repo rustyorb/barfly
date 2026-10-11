@@ -207,8 +207,12 @@ Two options, chosen in Settings:
 - **A cloned voice**, from the small server in `voice/`. It wraps
   [Chatterbox-Turbo](https://github.com/resemble-ai/chatterbox) (MIT), which clones a voice from about ten seconds
   of audio. Drop a clip into `voice/voices/`; the file name becomes the voice. With a cloned voice selected, his
-  persona gains three sounds he can make mid-line: `[cough]`, `[chuckle]`, `[laugh]`. He smokes, so the cough
-  gets used. The server plays him slower and lower as the buzz climbs, like a tape running down.
+  persona gains the nine sounds the model can perform mid-line, among them `[cough]`, `[sigh]`, `[groan]` and
+  `[chuckle]`. He smokes, so the cough gets used. The server plays him slower and lower as the buzz climbs, like a
+  tape running down. It also has its own page at `http://127.0.0.1:8880/ui` for trying voices and saving new ones.
+
+A voice model reads out anything it is handed. Stage directions, made-up sound tags and stray non-English text all
+come out as gibberish, so every line is stripped down to speech before it reaches either voice.
 
 Only clone a voice you have the right to use: your own, or one made for the purpose.
 
@@ -290,7 +294,8 @@ barfly/
 │   ├── build_data.py     downloads and packs the connectome (from doodle-fly)
 │   └── drunk-probe.ts    the inhibition and dopamine tables above, headless
 ├── voice/
-│   ├── server.py         75 lines: Chatterbox-Turbo behind two OpenAI-style routes
+│   ├── server.py         Chatterbox-Turbo behind two OpenAI-style routes
+│   ├── ui.py             the model's own Gradio demo, sharing the one loaded model, at /ui
 │   └── voices/           your ten-second clips go here; never committed
 └── .env.example          where machine addresses go instead of the code
 ```
