@@ -71,5 +71,5 @@ def speech(req: Speech):
     if speed != 1.0:
         wav = ta.functional.resample(wav, orig_freq=round(model.sr * speed), new_freq=model.sr)
     out = io.BytesIO()
-    ta.save(out, wav, model.sr, format="wav")
+    ta.save(out, wav, model.sr, format="wav", encoding="PCM_S", bits_per_sample=16)
     return Response(out.getvalue(), media_type="audio/wav")

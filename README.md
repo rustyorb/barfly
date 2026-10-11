@@ -224,6 +224,10 @@ npm run data    # downloads FlyWire v783 (~135 MB) and packs it to 34 MB in publ
 npm run dev     # http://localhost:5188
 ```
 
+After that first time, **`start-barfly.cmd`** (Windows) starts everything in one go: his voice if it is installed,
+the bar, and the page in your browser. It skips whatever is already running. `start-barfly.cmd --check` shows what
+it would do without doing it.
+
 The brain, the bar and both buttons work with nothing else installed. To hear him answer, start LM Studio's local
 server (or add a key in Settings).
 
@@ -273,6 +277,7 @@ Stated plainly, as of the first commit:
 
 ```
 barfly/
+├── start-barfly.cmd      one launcher: voice, bar, browser; skips what is already up
 ├── index.html            the bar, the panel, the settings dialog
 ├── src/
 │   ├── main.ts           the loop: what we do to him, what he does about it, the buzz

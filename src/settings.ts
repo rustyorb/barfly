@@ -81,17 +81,22 @@ export async function setUpSettings(cfg: MouthConfig): Promise<void> {
   });
   $("set-refresh").addEventListener("click", () => void refreshModels());
 
-  const local = await listLocalVoices();
-  voiceSel.replaceChildren(option("browser", "Browser's built-in voice"), ...local.map((v) => option(v, `${v} (local voice server)`)), option("", "Off"));
-  if (![...voiceSel.options].some((o) => o.value === cfg.voice)) cfg.voice = "browser";
-  voiceSel.value = cfg.voice;
+  // re-read every time Settings opens, so a voice server started later shows up without a reload
+  const refreshVoices = async () => {
+    const local = await listLocalVoices();
+    voiceSel.replaceChildren(option("browser", "Browser's built-in voice"), ...local.map((v) => option(v, `${v} (local voice server)`)), option("", "Off"));
+    // a saved voice that is not on offer right now is kept as the choice, and shown as unavailable
+    if (![...voiceSel.options].some((o) => o.value === cfg.voice)) voiceSel.append(option(cfg.voice, `${cfg.voice} (not running)`));
+    voiceSel.value = cfg.voice;
+    $("set-voice-note").textContent = local.length
+      ? ""
+      : "No local voice server is answering. Start the one in the voice folder (or Kokoro-FastAPI), then reopen Settings.";
+  };
   voiceSel.addEventListener("change", () => {
     cfg.voice = voiceSel.value;
     saveConfig(cfg);
   });
-  $("set-voice-note").textContent = local.length
-    ? ""
-    : "No local voice server is answering. Start the one in the voice folder (or Kokoro-FastAPI) and reload to get its voices.";
+  await refreshVoices();
 
   persona.value = cfg.persona;
   persona.addEventListener("input", () => {
@@ -103,7 +108,10 @@ export async function setUpSettings(cfg: MouthConfig): Promise<void> {
     saveConfig(cfg);
   });
 
-  $("open-settings").addEventListener("click", () => dialog.showModal());
+  $("open-settings").addEventListener("click", () => {
+    dialog.showModal();
+    void refreshVoices();
+  });
   $("set-close").addEventListener("click", () => dialog.close());
 
   showProvider();
