@@ -264,7 +264,7 @@ Stated plainly, as of the first commit:
 
 - **OpenAI and Anthropic with a real key.** The routes reach both companies and are refused correctly without a
   key. OpenRouter and LM Studio have been used end to end.
-- **The cloned voice.** The server is written; no line has been spoken through it yet.
+- **How the cloned voice sounds.** The server runs and returns audio: about two seconds per line on a 12 GB RTX A2000 after a slow first line, using 5.4 GB of video memory. Whether it sounds like the clip, and whether the sound tags land, is a judgement for ears.
 - **Any browser but Chromium**, and any machine but the one it was built on.
 - **Grooming.** The third thing a fly at a bar ought to do. The engine this is built on tracks sugar and looming
   only.
