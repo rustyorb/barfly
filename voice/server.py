@@ -13,7 +13,7 @@ import torch
 import torchaudio as ta
 from chatterbox.tts_turbo import ChatterboxTurboTTS
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 VOICES = Path(__file__).parent / "voices"
@@ -44,6 +44,15 @@ class Speech(BaseModel):
     model: str = ""
     response_format: str = "wav"
     speed: float = 1.0
+    # Chatterbox-Turbo's own sampling settings. (It ignores exaggeration and cfg_weight.)
+    temperature: float = 0.8
+    top_p: float = 0.95
+    repetition_penalty: float = 1.2
+
+
+@app.get("/", response_class=HTMLResponse)
+def test_page():
+    return (Path(__file__).parent / "test.html").read_text(encoding="utf-8")
 
 
 @app.get("/v1/models")
@@ -63,7 +72,13 @@ def speech(req: Speech):
         raise HTTPException(404, f"no voice named {req.voice!r}; have: {', '.join(found) or 'none'}")
     model = state["model"]
     with lock:
-        wav = model.generate(req.input, audio_prompt_path=str(found[req.voice]))
+        wav = model.generate(
+            req.input,
+            audio_prompt_path=str(found[req.voice]),
+            temperature=req.temperature,
+            top_p=req.top_p,
+            repetition_penalty=req.repetition_penalty,
+        )
     wav = wav.detach().cpu()
     # Slower also means lower, like a tape running down, which suits a drunk fly.
     # Speed is snapped to steps of 0.05 so the resampler stays cheap.
