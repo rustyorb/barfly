@@ -402,3 +402,58 @@ export async function useScannedHand(hand: THREE.Group): Promise<void> {
   // wrist higher than the fingertips, the way an arm reaches down onto a counter
   hand.userData.tilt = 0.16;
 }
+
+/** A model from public/art, sat on the ground at the origin: centred in x and z, its lowest point at y = 0. */
+async function prop(file: string, scaleTo: (size: THREE.Vector3) => number): Promise<THREE.Group> {
+  const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}art/${file}`);
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  const k = scaleTo(box.getSize(new THREE.Vector3()));
+  const centre = box.getCenter(new THREE.Vector3());
+  gltf.scene.position.set(-centre.x, -box.min.y, -centre.z);
+  const seated = new THREE.Group();
+  seated.add(gltf.scene);
+  seated.scale.setScalar(k);
+  seated.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
+  return seated;
+}
+
+/**
+ * Found objects, each used only if its file is there; the built stand-in stays otherwise.
+ * - "Ashtray with Cigarettes" by YJ_ (CC BY 4.0)
+ * - "Cigarette - daily3D" by RomanMaksy (CC BY 4.0)
+ * - "Bar Glasses" by Saandy (CC BY 4.0)
+ */
+export async function useFoundProps(
+  scene: THREE.Scene,
+  counterY: number,
+  builtAshtray: THREE.Object3D,
+  cigarette: THREE.Group,
+  builtCigarette: THREE.Object3D[],
+): Promise<void> {
+  // an ashtray that has seen some use, where the tin one was
+  void prop("ashtray_with_cigarettes.glb", size => 0.95 / Math.max(size.x, size.z)).then(ashtray => {
+    ashtray.position.copy(builtAshtray.position).setY(counterY + 0.004);
+    ashtray.position.x -= 0.08;
+    scene.add(ashtray);
+    builtAshtray.visible = false;
+  }, () => {});
+
+  // the cigarette he smokes: in its file it lies along x with the lit end at +x; ours stands along y, ember up
+  void prop("cigarette_-_daily3d.glb", size => 0.42 / size.x).then(real => {
+    const upright = new THREE.Group();
+    real.position.y = -0.005;
+    upright.add(real);
+    upright.rotation.z = Math.PI / 2;
+    cigarette.add(upright);
+    for (const part of builtCigarette) part.visible = false;
+  }, () => {});
+
+  // clean glasses lined up on our side of the bar
+  void prop("bar_glasses.glb", size => 0.46 / size.y).then(glasses => {
+    const glass = new THREE.MeshPhysicalMaterial({ color: "#e4ede6", roughness: 0.07, transmission: 0.9, thickness: 0.03, ior: 1.48, transparent: true, opacity: 0.55 });
+    glasses.traverse(o => { if (o instanceof THREE.Mesh) o.material = glass; });
+    glasses.rotation.y = Math.PI / 2;
+    glasses.position.set(-2.75, counterY, -1.5);
+    scene.add(glasses);
+  }, () => {});
+}

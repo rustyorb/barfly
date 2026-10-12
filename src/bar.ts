@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { FlyModel } from "./fly3d/fly.ts";
-import { bartenderHand, dressRegularCorner, dressRoom, labelTexture, useScannedHand, woodMaterial } from "./bar-art.ts";
+import { bartenderHand, dressRegularCorner, dressRoom, labelTexture, useFoundProps, useScannedHand, woodMaterial } from "./bar-art.ts";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -428,6 +428,8 @@ export class BarScene {
     const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.105, 12), new THREE.MeshStandardMaterial({ color: "#b99155", roughness: 0.8 }));
     filter.position.y = -0.16;
     this.cig.add(filter);
+    // real models of the ashtray, the cigarette and a row of glasses, where their files are present
+    void useFoundProps(this.scene, COUNTER, ashtray, this.cig, [paper, filter]);
     this.cig.position.copy(CIG_REST);
     this.cig.rotation.z = CIG_REST_TILT;
     this.scene.add(this.cig);

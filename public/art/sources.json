@@ -20,6 +20,27 @@
     "source": "https://sketchfab.com/3d-models/hand-arm-199e194fb33846e29e9f5a1a58f0b94b",
     "modifications": "Reduced from 3,137,021 to 62,737 triangles with glTF-Transform (weld, simplify, join); 85.5 MB to 1.3 MB. Barfly replaces the scan's material with a skin shader, straightens the arm, and adds a shirt sleeve over the cut end."
   },
+  "ashtray": {
+    "asset": "Ashtray with Cigarettes",
+    "author": "YJ_",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/ashtray-with-cigarettes-6e9bfb5e4b1e42b791a51c40cb993306",
+    "modifications": "Used as downloaded; scaled and placed."
+  },
+  "cigarette": {
+    "asset": "Cigarette - daily3D",
+    "author": "RomanMaksy",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/cigarette-daily3d-eff40b1550e0466a9c3273a519139143",
+    "modifications": "Used as downloaded; scaled, stood on end and animated in his hand. The glowing ember is added."
+  },
+  "glasses": {
+    "asset": "Bar Glasses",
+    "author": "Saandy",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/bar-glasses-c466971661f04251b159319b7dcc50a5",
+    "modifications": "Used as downloaded; scaled, placed, and given a clear glass material in place of its textures."
+  },
   "downloads": [
     {
       "url": "https://raw.githubusercontent.com/NeLy-EPFL/flygym/38c8ec61034cd59bc5ba0de20688d4a3c0000d60/src/flygym/assets/model/neuromechfly/rigging.yaml",

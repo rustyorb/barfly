@@ -363,6 +363,7 @@ Almost none of the hard parts were written here. That is the point of the projec
   [`public/art/LICENSE-NeuroMechFly.txt`](public/art/LICENSE-NeuroMechFly.txt) and [`public/art/sources.json`](public/art/sources.json).
 - **Wood material:** [Dimitrios Savva / Poly Haven, Wood Table](https://polyhaven.com/a/wood_table) (CC0).
 - **The bartender's hand:** [Hand-arm by Thunk3D scanner](https://sketchfab.com/3d-models/hand-arm-199e194fb33846e29e9f5a1a58f0b94b) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), a scan of a real hand, reduced from 3.1 million triangles to about 63,000. Changes are listed in [`public/art/sources.json`](public/art/sources.json).
+- **Ashtray, cigarette and glasses:** [Ashtray with Cigarettes by YJ_](https://sketchfab.com/3d-models/ashtray-with-cigarettes-6e9bfb5e4b1e42b791a51c40cb993306), [Cigarette - daily3D by RomanMaksy](https://sketchfab.com/3d-models/cigarette-daily3d-eff40b1550e0466a9c3273a519139143) and [Bar Glasses by Saandy](https://sketchfab.com/3d-models/bar-glasses-c466971661f04251b159319b7dcc50a5), all [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - **Connectome:** Dorkenwald, S. *et al.* Neuronal wiring diagram of an adult brain. *Nature* 634, 124–138 (2024);
   Schlegel, P. *et al.* Whole-brain annotation and multi-connectome cell typing of *Drosophila*. *Nature* 634,
   139–152 (2024). Cell types from [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations).
