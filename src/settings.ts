@@ -98,6 +98,13 @@ export async function setUpSettings(cfg: MouthConfig): Promise<void> {
   });
   await refreshVoices();
 
+  const visitors = $<HTMLInputElement>("set-visitors");
+  visitors.checked = cfg.visitors;
+  visitors.addEventListener("change", () => {
+    cfg.visitors = visitors.checked;
+    saveConfig(cfg);
+  });
+
   persona.value = cfg.persona;
   persona.addEventListener("input", () => {
     cfg.persona = persona.value;

@@ -43,6 +43,8 @@ export interface MouthConfig {
   persona: string;
   /** "" off, "browser", or a voice name on the local voice server */
   voice: string;
+  /** whether strangers wander in now and then and say something to him */
+  visitors: boolean;
 }
 
 // First draft of who he is. It is meant to be rewritten, in Settings.
@@ -94,7 +96,7 @@ const isLocalVoice = (voice: string) => voice !== "" && voice !== "browser";
 const STORE = "barfly.mouth.v1";
 
 export function loadConfig(): MouthConfig {
-  const base: MouthConfig = { provider: PROVIDERS[0].id, models: {}, keys: {}, persona: DEFAULT_PERSONA, voice: "browser" };
+  const base: MouthConfig = { provider: PROVIDERS[0].id, models: {}, keys: {}, persona: DEFAULT_PERSONA, voice: "browser", visitors: true };
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) ?? "{}") as Partial<MouthConfig>;
     const cfg = { ...base, ...saved, models: { ...saved.models }, keys: { ...saved.keys } };
@@ -198,6 +200,18 @@ const tidy = (s: string) =>
     .replace(/^\s*Barfly:\s*/i, "")
     .trim();
 
+/** Who might come through the door. Tropes, not anyone in particular. */
+const VISITORS = [
+  { name: "Doom fly", is: "a fly whose job is playing the same level of a shooting game all day, and who has never once finished it" },
+  { name: "Crypto fly", is: "a fly who trades crypto for a living and has never made any money" },
+  { name: "Night-shift fly", is: "a fly who works night security at a pizza place and is afraid of the dark" },
+  { name: "Driver fly", is: "a fly who drives a car in a simulator all day and has not learned to brake" },
+  { name: "Chess fly", is: "a fly who plays chess for a living and was never taught the rules" },
+  { name: "Blackjack fly", is: "a fly who deals with a losing streak at the blackjack table" },
+  { name: "Lost fly", is: "a delivery fly who has the wrong address and is in a hurry" },
+  { name: "Mayfly", is: "a mayfly on the last evening of his one-day life, in a good mood about it" },
+];
+
 export class Mouth {
   readonly cfg: MouthConfig;
   private history: Anthropic.MessageParam[] = [];
@@ -210,24 +224,41 @@ export class Mouth {
     return this.cfg.models[this.cfg.provider] ?? "";
   }
 
-  async say(text: string, facts: BodyFacts): Promise<string> {
-    const { provider } = this.cfg;
+  /** His answer to something said to him. `speaker` is who said it: the bartender, or whoever just walked in. */
+  async say(text: string, facts: BodyFacts, speaker = "Bartender"): Promise<string> {
     const persona = this.cfg.persona + SPEECH_ONLY + (isLocalVoice(this.cfg.voice) ? SOUND_TAGS : "");
-    const key = this.cfg.keys[provider] ?? "";
-    const messages: Anthropic.MessageParam[] = [
+    const reply = await this.ask(persona, [
       ...this.history.slice(-12),
-      { role: "user", content: `${describe(facts)}\n\nBartender: ${text}` },
-    ];
+      { role: "user", content: `${describe(facts)}\n\n${speaker}: ${text}` },
+    ]);
+    // keep what was said without the body note, so old notes do not pile up as "facts"
+    this.history.push({ role: "user", content: `${speaker}: ${text}` }, { role: "assistant", content: reply });
+    return reply;
+  }
+
+  /** One short line from a stranger who has just come through the door. */
+  async walkIn(): Promise<{ who: string; line: string }> {
+    const v = VISITORS[Math.floor(Math.random() * VISITORS.length)];
+    const system =
+      `You are ${v.is}. You have just walked into a dive bar after a long shift. ` +
+      `You say one thing to the old regular sitting at the end of the bar: a complaint, a question or a confession about your day. ` +
+      `One short sentence, the way a tired stranger would say it. Do not introduce yourself.` +
+      SPEECH_ONLY;
+    const line = await this.ask(system, [{ role: "user", content: "You walk in. What do you say to him?" }]);
+    return { who: v.name, line: speakable(line, false) || line };
+  }
+
+  private async ask(system: string, messages: Anthropic.MessageParam[]): Promise<string> {
+    const { provider } = this.cfg;
+    const key = this.cfg.keys[provider] ?? "";
     let reply: string;
     try {
-      reply = provider === "anthropic" ? await this.viaAnthropic(key, persona, messages) : await this.viaChatCompletions(provider, key, persona, messages);
+      reply = provider === "anthropic" ? await this.viaAnthropic(key, system, messages) : await this.viaChatCompletions(provider, key, system, messages);
     } catch (err) {
       throw new Error(reason(err));
     }
     reply = tidy(reply);
     if (!reply) throw new Error("the model sent back nothing");
-    // keep the bartender's words without the body note, so old notes do not pile up as "facts"
-    this.history.push({ role: "user", content: `Bartender: ${text}` }, { role: "assistant", content: reply });
     return reply;
   }
 
@@ -277,6 +308,25 @@ export async function listLocalVoices(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/** A stranger's line in the browser's own voice, pitched up so it is plainly not him. Resolves when it is done. */
+export function speakStranger(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!("speechSynthesis" in window)) return resolve();
+    const u = new SpeechSynthesisUtterance(speakable(text, false));
+    const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith("en"));
+    const pick = voices.find((v) => /zira|aria|jenny|female|hazel|susan/i.test(v.name)) ?? voices[1] ?? voices[0];
+    if (pick) u.voice = pick;
+    u.pitch = 1.25;
+    u.rate = 1.08;
+    const done = setTimeout(resolve, 9000);
+    u.onend = u.onerror = () => {
+      clearTimeout(done);
+      resolve();
+    };
+    speechSynthesis.speak(u);
+  });
 }
 
 let playing: HTMLAudioElement | null = null;

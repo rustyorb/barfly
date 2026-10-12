@@ -1,7 +1,7 @@
 // Barfly. A whole fly brain on a stool: we put sugar on his tongue and bang the door; he does the rest.
 import { BarScene } from "./bar.ts";
 import { BrainClient } from "./brain/client.ts";
-import { loadConfig, Mouth, speak } from "./chat.ts";
+import { loadConfig, Mouth, speak, speakStranger } from "./chat.ts";
 import { setUpSettings } from "./settings.ts";
 import { TRACKED, type FrameResult, type ReadyInfo, type SensoryInput } from "./brain/protocol.ts";
 
@@ -146,7 +146,7 @@ function tick(now: number): void {
   $("v-gaba").textContent = `x${gabaGain.toFixed(2)}`;
 }
 
-function line(who: "you" | "him" | "oops", text: string): void {
+function line(who: "you" | "him" | "guest" | "oops", text: string): void {
   const li = document.createElement("li");
   li.className = who;
   li.textContent = text;
@@ -155,35 +155,65 @@ function line(who: "you" | "him" | "oops", text: string): void {
   $("chat").scrollTop = $("chat").scrollHeight;
 }
 
+/** true while a line is being fetched or answered, so the bartender and a stranger never talk over each other */
+let busy = false;
+/** seconds until the next stranger */
+let strangerIn = 75;
+
+const facts = () => ({ tab, buzz, beer, drinking, recent, minutesAtBar: (performance.now() - startedAt) / 60000 });
+
+/** Now and then someone comes through the door, says one thing to him, and he answers. */
+async function strangerWalksIn(): Promise<void> {
+  busy = true;
+  try {
+    // the same looming signal as the Bang the door button, so his flinch at the newcomer is his own
+    loomLeft = LOOM_MS;
+    const { who, line: said } = await mouth.walkIn();
+    log(`door banged open: ${who} walked in`);
+    line("guest", `${who}: ${said}`);
+    if (mouth.cfg.voice) await speakStranger(said);
+    const reply = await mouth.say(said, facts(), `${who}, who has just walked in,`);
+    line("him", reply);
+    speak(reply, buzz, mouth.cfg.voice, (on) => (talking = on)).catch(() => {});
+  } catch {
+    // a stranger who cannot think of anything to say just leaves; no need to tell anyone
+  } finally {
+    busy = false;
+  }
+}
+
 function setUpMouth(): void {
   void setUpSettings(mouth.cfg);
+
+  setInterval(() => {
+    if (!mouth.cfg.visitors || !mouth.model || busy || document.hidden) return;
+    strangerIn -= 1;
+    if (strangerIn > 0) return;
+    strangerIn = 90 + Math.random() * 120;
+    void strangerWalksIn();
+  }, 1000);
 
   $<HTMLFormElement>("say").addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $<HTMLInputElement>("say-text");
     const text = input.value.trim();
-    if (!text || input.disabled) return;
+    if (!text || busy) return;
     if (!mouth.model) {
       line("oops", "He has no language model to speak with. Open Settings and pick one.");
       return;
     }
     input.value = "";
+    busy = true;
     input.disabled = true;
     line("you", text);
     try {
-      const reply = await mouth.say(text, {
-        tab,
-        buzz,
-        beer,
-        drinking,
-        recent,
-        minutesAtBar: (performance.now() - startedAt) / 60000,
-      });
+      const reply = await mouth.say(text, facts());
       line("him", reply);
       speak(reply, buzz, mouth.cfg.voice, (on) => (talking = on)).catch((err) => line("oops", `No voice: ${(err as Error).message}.`));
     } catch (err) {
       line("oops", `He said nothing: ${(err as Error).message}.`);
     } finally {
+      busy = false;
       input.disabled = false;
       input.focus();
     }
@@ -214,6 +244,7 @@ async function boot(): Promise<void> {
     `The sagging wings, lids and sway are animation tied to the same meter. ` +
     `His big eyes are a costume worn over his real compound eyes; the red in them is what is left of the real ones. ` +
     `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. ` +
+    `Strangers who walk in are written by the same language model; the door that announces them is the same looming signal, so his flinch at them is his own. ` +
     `His words come from the language model picked in Settings, which is told what his body just did; his voice is your browser's or a local voice server's. Neither one touches his brain. ` +
     `Brain engine and 3D fly from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
     `FlyWire data: CC BY-NC 4.0, Dorkenwald et al. and Schlegel et al., Nature 2024.`;
@@ -238,7 +269,7 @@ async function boot(): Promise<void> {
   $("dock").hidden = false;
   startedAt = performance.now();
   lastNow = startedAt;
-  if (import.meta.env.DEV) Object.assign(window, { __barfly: { hz, bar, state: () => ({ beer, tab, proboscis, startle, door, buzz }), setBuzz: (v: number) => (buzz = v) } });
+  if (import.meta.env.DEV) Object.assign(window, { __barfly: { hz, bar, state: () => ({ beer, tab, proboscis, startle, door, buzz }), setBuzz: (v: number) => (buzz = v), stranger: () => strangerWalksIn() } });
   requestAnimationFrame(tick);
 }
 

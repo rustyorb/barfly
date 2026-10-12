@@ -200,6 +200,9 @@ h2 {
   color: var(--dim);
   font-style: italic;
 }
+#chat li.guest {
+  border-left-color: var(--rain);
+}
 #chat li.oops {
   color: #d98c8c;
   font-size: 13px;
@@ -232,6 +235,13 @@ h2 {
   border: 1px solid var(--line);
   padding: 4px 6px;
   max-width: 220px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  margin: 0 0 6px;
 }
 button.quiet {
   border-color: var(--line);
