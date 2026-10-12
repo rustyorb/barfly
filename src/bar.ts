@@ -49,7 +49,12 @@ const GUEST_FLY_S = 2.4;
 const GUEST_SETTLE_S = 0.5;
 const GUEST_RECOVER_S = 1.7;
 const GUEST_MISS = new THREE.Vector3(1.75, SEAT + 0.5, -0.6);
-const SERVE_MUG_START = new THREE.Vector3(1.35, COUNTER + 0.85, -1.05);
+/** the beer arrives from the bartender's side of the bar, which is where we are standing */
+const SERVE_FROM = new THREE.Vector3(-0.9, COUNTER + 0.7, -5.6);
+const SERVE_MUG_START = new THREE.Vector3(-0.25, COUNTER + 0.55, -2.3);
+/** the hand reaches away from us: its forearm points back toward the camera */
+const SERVE_YAW = Math.PI / 2 - 0.18;
+const HAND_SCALE = 0.8;
 const MUG_REST = new THREE.Vector3(0, COUNTER, -0.72);
 
 function signTexture(): THREE.Texture {
@@ -487,7 +492,7 @@ export class BarScene {
     this.bartenderT = 0;
     this.handLoomed = false;
     this.bartender.visible = true;
-    this.mug.position.set(4.82, COUNTER + 1.96, -0.78);
+    this.mug.position.copy(SERVE_FROM);
     return new Promise(resolve => { this.served = resolve; });
   }
 
@@ -501,11 +506,13 @@ export class BarScene {
     };
     const approach = ease(T / 1.1);
     const place = ease((T - 0.8) / 0.9);
-    this.mug.position.lerpVectors(new THREE.Vector3(4.82, COUNTER + 1.96, -0.78), SERVE_MUG_START, approach).lerp(MUG_REST, place);
+    this.mug.position.lerpVectors(SERVE_FROM, SERVE_MUG_START, approach).lerp(MUG_REST, place);
     this.mug.rotation.z = 0.04 * Math.sin(T * 5) * (1 - place);
-    const grip = this.mug.position.clone().add(this.bartender.userData.grip as THREE.Vector3);
-    this.bartender.position.copy(grip);
-    this.bartender.rotation.set(0.05, -0.1, -0.08 * (1 - place));
+    this.bartender.rotation.set(0, SERVE_YAW, 0);
+    this.bartender.scale.setScalar(HAND_SCALE);
+    // where the hand has to be for the mug to sit in its grip, turned to match the hand
+    const offset = (this.bartender.userData.grip as THREE.Vector3).clone().multiplyScalar(HAND_SCALE).applyEuler(this.bartender.rotation);
+    this.bartender.position.copy(this.mug.position).add(offset);
     if (T > 0.75 && !this.handLoomed) {
       this.handLoomed = true;
       this.onBartenderLoom();
@@ -515,8 +522,7 @@ export class BarScene {
       this.served = null;
     }
     const withdraw = ease((T - 2) / 1.2);
-    this.bartender.position.lerp(new THREE.Vector3(5.5, COUNTER + 2.8, -0.7), withdraw);
-    this.bartender.rotation.z -= 0.3 * withdraw;
+    this.bartender.position.lerp(new THREE.Vector3(SERVE_FROM.x, SERVE_FROM.y + 1.0, SERVE_FROM.z), withdraw);
     if (T >= 3.2) {
       this.bartenderT = -1;
       this.bartender.visible = false;
