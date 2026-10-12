@@ -200,16 +200,23 @@ const tidy = (s: string) =>
     .replace(/^\s*Barfly:\s*/i, "")
     .trim();
 
+export interface Visitor {
+  name: string;
+  /** the colour his body leans toward, so you can tell visitors apart */
+  tint: string;
+  is: string;
+}
+
 /** Who might come through the door. Tropes, not anyone in particular. */
-const VISITORS = [
-  { name: "Doom fly", is: "a fly whose job is playing the same level of a shooting game all day, and who has never once finished it" },
-  { name: "Crypto fly", is: "a fly who trades crypto for a living and has never made any money" },
-  { name: "Night-shift fly", is: "a fly who works night security at a pizza place and is afraid of the dark" },
-  { name: "Driver fly", is: "a fly who drives a car in a simulator all day and has not learned to brake" },
-  { name: "Chess fly", is: "a fly who plays chess for a living and was never taught the rules" },
-  { name: "Blackjack fly", is: "a fly who deals with a losing streak at the blackjack table" },
-  { name: "Lost fly", is: "a delivery fly who has the wrong address and is in a hurry" },
-  { name: "Mayfly", is: "a mayfly on the last evening of his one-day life, in a good mood about it" },
+const VISITORS: Visitor[] = [
+  { name: "Doom fly", tint: "#5f8f3a", is: "a fly whose job is playing the same level of a shooting game all day, and who has never once finished it" },
+  { name: "Crypto fly", tint: "#d9b21c", is: "a fly who trades crypto for a living and has never made any money" },
+  { name: "Night-shift fly", tint: "#3d4f8a", is: "a fly who works night security at a pizza place and is afraid of the dark" },
+  { name: "Driver fly", tint: "#b03a2a", is: "a fly who drives a car in a simulator all day and has not learned to brake" },
+  { name: "Chess fly", tint: "#e8e2d0", is: "a fly who plays chess for a living and was never taught the rules" },
+  { name: "Blackjack fly", tint: "#1f7a52", is: "a fly who deals with a losing streak at the blackjack table" },
+  { name: "Lost fly", tint: "#a05a2c", is: "a delivery fly who has the wrong address and is in a hurry" },
+  { name: "Mayfly", tint: "#9fd0d8", is: "a mayfly on the last evening of his one-day life, in a good mood about it" },
 ];
 
 export class Mouth {
@@ -236,9 +243,13 @@ export class Mouth {
     return reply;
   }
 
-  /** One short line from a stranger who has just come through the door. */
-  async walkIn(): Promise<{ who: string; line: string }> {
-    const v = VISITORS[Math.floor(Math.random() * VISITORS.length)];
+  /** Who comes through the door next. */
+  pickVisitor(): Visitor {
+    return VISITORS[Math.floor(Math.random() * VISITORS.length)];
+  }
+
+  /** One short line from the stranger who has just come through the door. */
+  async walkIn(v: Visitor): Promise<{ who: string; line: string }> {
     const system =
       `You are ${v.is}. You have just walked into a dive bar after a long shift. ` +
       `You say one thing to the old regular sitting at the end of the bar: a complaint, a question or a confession about your day. ` +

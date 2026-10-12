@@ -26,6 +26,9 @@ let info: ReadyInfo;
 let beer = 0;
 let tab = 0;
 let loomLeft = 0;
+/** ms the door is held open for someone coming or going, without any looming signal */
+let doorHold = 0;
+let guestTalking = false;
 let door = 0;
 let proboscis = 0;
 let startle = 0;
@@ -133,10 +136,11 @@ function tick(now: number): void {
   if (!brain.pending && budget >= FRAME_MS) sendStep();
 
   // the door swings open fast and drifts shut
-  const doorTarget = loomLeft > 0 ? 1 : 0;
+  doorHold = Math.max(0, doorHold - realDt);
+  const doorTarget = loomLeft > 0 || doorHold > 0 ? 1 : 0;
   door += (doorTarget - door) * (1 - Math.exp(-realDt / (doorTarget ? 60 : 900)));
 
-  bar.render(realDt / 1000, { proboscis, startle, beer, door, tab, drunk: buzz, talking });
+  bar.render(realDt / 1000, { proboscis, startle, beer, door, tab, drunk: buzz, talking, guestTalking });
   meter("sugar", hz.sugar, 160);
   meter("mouth", hz.mouth, 40);
   meter("loom", hz.loom, 160);
@@ -162,22 +166,37 @@ let strangerIn = 75;
 
 const facts = () => ({ tab, buzz, beer, drinking, recent, minutesAtBar: (performance.now() - startedAt) / 60000 });
 
-/** Now and then someone comes through the door, says one thing to him, and he answers. */
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Now and then someone flies in, lands on the next stool, says one thing to him, hears the answer and leaves. */
 async function strangerWalksIn(): Promise<void> {
   busy = true;
+  const visitor = mouth.pickVisitor();
   try {
     // the same looming signal as the Bang the door button, so his flinch at the newcomer is his own
     loomLeft = LOOM_MS;
-    const { who, line: said } = await mouth.walkIn();
-    log(`door banged open: ${who} walked in`);
+    doorHold = 3200;
+    log(`door banged open: ${visitor.name} flew in`);
+    // he thinks of his line on the way to the stool
+    const [{ who, line: said }] = await Promise.all([mouth.walkIn(visitor), bar.guestArrive(visitor.tint)]);
     line("guest", `${who}: ${said}`);
-    if (mouth.cfg.voice) await speakStranger(said);
-    const reply = await mouth.say(said, facts(), `${who}, who has just walked in,`);
+    if (mouth.cfg.voice) {
+      guestTalking = true;
+      await speakStranger(said);
+      guestTalking = false;
+    }
+    const reply = await mouth.say(said, facts(), `${who}, who has just flown in and sat down next to you,`);
     line("him", reply);
     speak(reply, buzz, mouth.cfg.voice, (on) => (talking = on)).catch(() => {});
+    // long enough to hear the answer, then he goes
+    await wait(2500 + reply.length * 70);
   } catch {
     // a stranger who cannot think of anything to say just leaves; no need to tell anyone
   } finally {
+    guestTalking = false;
+    doorHold = 3400;
+    bar.guestLeave();
+    log(`${visitor.name} left`);
     busy = false;
   }
 }
@@ -244,7 +263,7 @@ async function boot(): Promise<void> {
     `The sagging wings, lids and sway are animation tied to the same meter. ` +
     `His big eyes are a costume worn over his real compound eyes; the red in them is what is left of the real ones. ` +
     `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. ` +
-    `Strangers who walk in are written by the same language model; the door that announces them is the same looming signal, so his flinch at them is his own. ` +
+    `Strangers who fly in are the same fly model with no brain behind it, flown along a set path, and their lines are written by the same language model; the door that announces them is the same looming signal, so his flinch at them is his own. ` +
     `His words come from the language model picked in Settings, which is told what his body just did; his voice is your browser's or a local voice server's. Neither one touches his brain. ` +
     `Brain engine and 3D fly from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
     `FlyWire data: CC BY-NC 4.0, Dorkenwald et al. and Schlegel et al., Nature 2024.`;

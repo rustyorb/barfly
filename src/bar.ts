@@ -18,6 +18,8 @@ export interface BarState {
   drunk: number;
   /** true while his voice is playing */
   talking: boolean;
+  /** true while the visitor on the next stool is speaking */
+  guestTalking: boolean;
 }
 
 /** stool seat height; the fly's feet rest at this y */
@@ -30,6 +32,15 @@ const CIG_REST = new THREE.Vector3(-0.9, COUNTER + 0.13, -0.95);
 const CIG_REST_TILT = Math.PI / 2 - 0.25;
 /** the cigarette at his mouth: filter end at his face, ember out to his left */
 const CIG_AT_MOUTH = new THREE.Vector3(-0.27, SEAT + 0.9, -0.8);
+/** a visitor flies in from the doorway, over the floor, to the stool between him and the door */
+const GUEST_DOOR = new THREE.Vector3(5.6, 2.7, 5.5);
+const GUEST_OVER = new THREE.Vector3(4.6, SEAT + 2.4, 2.4);
+const GUEST_SEAT = new THREE.Vector3(2.6, SEAT, 0);
+const GUEST_HOVER = new THREE.Vector3(2.6, SEAT + 0.8, 0);
+/** how he sits: at the bar, turned a little toward the regular */
+const GUEST_YAW = 0.55;
+const GUEST_FLY_S = 2.4;
+const GUEST_SETTLE_S = 0.5;
 
 function signTexture(): THREE.Texture {
   const c = document.createElement("canvas");
@@ -105,6 +116,12 @@ export class BarScene {
   private smokeT = -1;
   private dragged = false;
   private exhaled = false;
+  /** whoever came in: a second fly, hidden until someone arrives */
+  private readonly guest = new FlyModel();
+  private readonly guestColors: { mat: THREE.MeshStandardMaterial; base: THREE.Color }[] = [];
+  private guestPhase: "away" | "in" | "sit" | "out" = "away";
+  private guestT = 0;
+  private guestLanded: (() => void) | null = null;
   private readonly restL: THREE.Vector3;
   private readonly restR: THREE.Vector3;
   private readonly canvas: HTMLCanvasElement;
@@ -290,8 +307,114 @@ export class BarScene {
     this.restL = new THREE.Vector3(-0.45, COUNTER - SEAT, -0.9);
     this.restR = new THREE.Vector3(0.45, COUNTER - SEAT, -0.9);
 
+    // the visitor: the same fly, a touch smaller, tinted per visitor when he arrives
+    this.guest.root.scale.setScalar(0.9);
+    this.guest.root.visible = false;
+    this.scene.add(this.guest.root);
+    this.guest.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      if (mat.color && !this.guestColors.some((g) => g.mat === mat)) this.guestColors.push({ mat, base: mat.color.clone() });
+    });
+
     this.resize();
     window.addEventListener("resize", () => this.resize());
+  }
+
+  /** Someone flies in through the door and lands on the next stool. Resolves once he has landed. */
+  guestArrive(tint: string): Promise<void> {
+    const t = new THREE.Color(tint);
+    for (const g of this.guestColors) g.mat.color.copy(g.base).lerp(t, 0.4);
+    this.guestPhase = "in";
+    this.guestT = 0;
+    this.guest.root.visible = true;
+    return new Promise((resolve) => (this.guestLanded = resolve));
+  }
+
+  /** He takes off and goes back out the way he came. */
+  guestLeave(): void {
+    if (this.guestPhase === "away" || this.guestPhase === "out") return;
+    this.guestLanded?.();
+    this.guestLanded = null;
+    this.guestPhase = "out";
+    this.guestT = 0;
+  }
+
+  private updateGuest(dt: number, talking: boolean): void {
+    if (this.guestPhase === "away") return;
+    this.guestT += dt;
+    const root = this.guest.root;
+    const smooth = (x: number) => {
+      const c = Math.min(1, Math.max(0, x));
+      return c * c * (3 - 2 * c);
+    };
+    // where he is along the one curve from the door to above his stool, and which way that curve points
+    const along = (u: number) => {
+      const a = GUEST_DOOR.clone().lerp(GUEST_OVER, u);
+      const b = GUEST_OVER.clone().lerp(GUEST_HOVER, u);
+      return { at: a.clone().lerp(b, u), toward: b.sub(a) };
+    };
+    const yawOf = (dir: THREE.Vector3) => Math.atan2(-dir.x, -dir.z);
+
+    let wings = 1;
+    const sitting = this.guestPhase === "sit";
+    if (sitting) {
+      root.position.copy(GUEST_SEAT);
+      root.rotation.y = GUEST_YAW;
+      wings = 0;
+    } else if (this.guestPhase === "in") {
+      // fly the curve, then drop the last bit onto the seat and fold the wings
+      const { at, toward } = along(smooth(this.guestT / GUEST_FLY_S));
+      const settle = smooth((this.guestT - GUEST_FLY_S) / GUEST_SETTLE_S);
+      at.y -= (GUEST_HOVER.y - GUEST_SEAT.y) * settle;
+      at.y += 0.06 * Math.sin(this.t * 9) * (1 - settle);
+      root.position.copy(at);
+      const turn = smooth((this.guestT - GUEST_FLY_S * 0.7) / (GUEST_FLY_S * 0.3 + GUEST_SETTLE_S));
+      const heading = yawOf(toward);
+      root.rotation.y = heading + (GUEST_YAW - heading) * turn;
+      wings = 1 - settle;
+      if (this.guestT >= GUEST_FLY_S + GUEST_SETTLE_S) {
+        this.guestPhase = "sit";
+        this.guestLanded?.();
+        this.guestLanded = null;
+      }
+    } else {
+      // lift off the stool, then fly the same curve back to the door
+      const lift = smooth(this.guestT / GUEST_SETTLE_S);
+      const { at, toward } = along(1 - smooth((this.guestT - GUEST_SETTLE_S) / GUEST_FLY_S));
+      at.y -= (GUEST_HOVER.y - GUEST_SEAT.y) * (1 - lift);
+      at.y += 0.06 * Math.sin(this.t * 9) * lift;
+      root.position.copy(at);
+      const away = yawOf(toward.multiplyScalar(-1));
+      root.rotation.y = GUEST_YAW + (away - GUEST_YAW) * smooth(this.guestT / (GUEST_SETTLE_S + 0.6));
+      if (this.guestT >= GUEST_SETTLE_S + GUEST_FLY_S) {
+        this.guestPhase = "away";
+        root.visible = false;
+      }
+    }
+
+    // sitting, his front feet go up on the counter like the regular's; in the air the legs hang
+    let footL: THREE.Vector3 | null = null;
+    let footR: THREE.Vector3 | null = null;
+    if (sitting) {
+      root.updateMatrixWorld();
+      footL = root.worldToLocal(new THREE.Vector3(GUEST_SEAT.x - 0.75, COUNTER, -0.7));
+      footR = root.worldToLocal(new THREE.Vector3(GUEST_SEAT.x + 0.05, COUNTER, -0.95));
+    }
+    this.guest.update(dt, {
+      pressL: footL,
+      pressR: footR,
+      reachL: sitting ? 1 : 0,
+      reachR: sitting ? 1 : 0,
+      proboscis: 0,
+      startle: 0.25,
+      buzz: wings,
+      lookX: 0,
+      bob: talking && sitting ? 0.5 + 0.5 * Math.sin(this.t * 14) : 0,
+      drunk: 0,
+    });
   }
 
   resize(): void {
@@ -418,6 +541,8 @@ export class BarScene {
       bob: s.talking ? 0.5 + 0.5 * Math.sin(this.t * 13) : 0,
       drunk: s.drunk,
     });
+
+    this.updateGuest(dt, s.guestTalking);
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
