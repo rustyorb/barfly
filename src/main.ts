@@ -199,6 +199,7 @@ async function boot(): Promise<void> {
     $("loading-stage").textContent = `Something broke: ${msg}`;
   };
   brain.onFrame = onFrame;
+  bar.onDrag = () => log("took a drag");
   info = await brain.init(new URL(import.meta.env.BASE_URL, location.href).href);
 
   const sugarN = info.groups.sugar_GRN_L.length + info.groups.sugar_GRN_R.length;
@@ -212,7 +213,7 @@ async function boot(): Promise<void> {
     `That is a cartoon of what alcohol does. What follows from it, the slower drinking and the duller flinch, is his wiring, not us. ` +
     `The sagging wings, lids and sway are animation tied to the same meter. ` +
     `His big eyes are a costume worn over his real compound eyes; the red in them is what is left of the real ones. ` +
-    `The mug, the smokes, the stool and the bar are set dressing. ` +
+    `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. ` +
     `His words come from the language model picked in Settings, which is told what his body just did; his voice is your browser's or a local voice server's. Neither one touches his brain. ` +
     `Brain engine and 3D fly from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
     `FlyWire data: CC BY-NC 4.0, Dorkenwald et al. and Schlegel et al., Nature 2024.`;

@@ -25,6 +25,11 @@ const SEAT = 1.5;
 /** counter top, a little above the seat so his front legs rest on it */
 const COUNTER = SEAT + 0.12;
 const MUG_H = 0.4;
+/** the cigarette resting on the lip of the ashtray, ember over the dish */
+const CIG_REST = new THREE.Vector3(-0.9, COUNTER + 0.13, -0.95);
+const CIG_REST_TILT = Math.PI / 2 - 0.25;
+/** the cigarette at his mouth: filter end at his face, ember out to his left */
+const CIG_AT_MOUTH = new THREE.Vector3(-0.27, SEAT + 0.9, -0.8);
 
 function signTexture(): THREE.Texture {
   const c = document.createElement("canvas");
@@ -88,6 +93,18 @@ export class BarScene {
   private readonly receipt: THREE.Mesh;
   private readonly receiptMap: THREE.Texture;
   private readonly smoke: THREE.Sprite[] = [];
+  private readonly cig = new THREE.Group();
+  private readonly ember: THREE.Mesh;
+  /** the smoke he blows out after a drag */
+  private readonly puffs: { sprite: THREE.Sprite; vel: THREE.Vector3; age: number; life: number }[] = [];
+  /** called once each time he takes a drag, so the page can note it */
+  onDrag: () => void = () => {};
+  /** seconds until he next reaches for the cigarette */
+  private smokeIn = 9;
+  /** seconds into the current cigarette break, or -1 when he is not smoking */
+  private smokeT = -1;
+  private dragged = false;
+  private exhaled = false;
   private readonly restL: THREE.Vector3;
   private readonly restR: THREE.Vector3;
   private readonly canvas: HTMLCanvasElement;
@@ -230,13 +247,14 @@ export class BarScene {
     const ashtray = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.08, 28), new THREE.MeshStandardMaterial({ color: "#15130f", roughness: 0.3, metalness: 0.6 }));
     ashtray.position.set(-1.05, COUNTER + 0.04, -0.95);
     this.scene.add(ashtray);
-    const cig = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.42, 10), new THREE.MeshStandardMaterial({ color: "#f3efe6", roughness: 0.8 }));
-    cig.rotation.z = Math.PI / 2 - 0.25;
-    cig.position.set(-0.9, COUNTER + 0.13, -0.95);
-    this.scene.add(cig);
-    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshBasicMaterial({ color: "#ff6a1f" }));
-    ember.position.set(-1.1, COUNTER + 0.18, -0.95);
-    this.scene.add(ember);
+    // the cigarette is one piece so he can pick it up: filter at -y, ember at +y
+    const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.42, 10), new THREE.MeshStandardMaterial({ color: "#f3efe6", roughness: 0.8 }));
+    this.ember = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshBasicMaterial({ color: "#ff6a1f" }));
+    this.ember.position.y = 0.21;
+    this.cig.add(paper, this.ember);
+    this.cig.position.copy(CIG_REST);
+    this.cig.rotation.z = CIG_REST_TILT;
+    this.scene.add(this.cig);
     const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: "#a31a1a", roughness: 0.6 }));
     pack.position.set(-1.6, COUNTER + 0.05, -1.25);
     pack.rotation.y = 0.4;
@@ -246,6 +264,11 @@ export class BarScene {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeMat, color: "#cfd6e2", transparent: true, depthWrite: false, opacity: 0 }));
       this.smoke.push(s);
       this.scene.add(s);
+    }
+    for (let i = 0; i < 18; i++) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeMat, color: "#d9dee6", transparent: true, depthWrite: false, opacity: 0 }));
+      this.puffs.push({ sprite, vel: new THREE.Vector3(), age: 99, life: 1 });
+      this.scene.add(sprite);
     }
 
     // the tab: a receipt that gets longer with every beer
@@ -299,30 +322,99 @@ export class BarScene {
     this.receipt.scale.y = len;
     this.receiptMap.repeat.set(1, len);
 
-    // a thin thread off the ember that wavers, then breaks up and spreads under the lamp
+    // He smokes on a timer, a little more often the drunker he is. This is animation, not his brain.
+    // One break: reach for it, lift it, drag, put it back, blow the smoke out.
+    const idle = s.proboscis < 0.15 && s.startle < 0.15 && !s.talking;
+    if (this.smokeT < 0) {
+      this.smokeIn -= dt;
+      if (this.smokeIn <= 0 && idle) {
+        this.smokeT = 0;
+        this.dragged = this.exhaled = false;
+      }
+    } else {
+      this.smokeT += dt;
+      // a flinch makes him put it straight back down
+      if (s.startle > 0.4 && this.smokeT < 3.2) this.smokeT = this.smokeT < 0.8 ? 4.2 : 3.2;
+      if (this.smokeT >= 5) {
+        this.smokeT = -1;
+        this.smokeIn = (20 + Math.random() * 25) * (1 - 0.35 * s.drunk);
+      }
+    }
+    const T = this.smokeT;
+    const ease = (x: number) => {
+      const c = Math.min(1, Math.max(0, x));
+      return c * c * (3 - 2 * c);
+    };
+    const reach = T < 0 ? 0 : ease(T / 0.8) * (1 - ease((T - 4.2) / 0.8)); // his foot is on the cigarette
+    const lift = T < 0 ? 0 : ease((T - 0.8) / 1.0) * (1 - ease((T - 3.2) / 1.0)); // the cigarette is at his mouth
+    const drag = T < 0 ? 0 : ease((T - 1.9) / 0.3) * (1 - ease((T - 2.9) / 0.3));
+    if (T > 1.9 && T < 3.2 && !this.dragged) {
+      this.dragged = true;
+      this.onDrag();
+    }
+
+    this.cig.position.lerpVectors(CIG_REST, CIG_AT_MOUTH, lift);
+    this.cig.position.y += Math.sin(Math.PI * lift) * 0.15;
+    this.cig.rotation.z = CIG_REST_TILT + (Math.PI / 2 - CIG_REST_TILT) * lift;
+    this.cig.updateMatrixWorld(true);
+    this.ember.scale.setScalar(1 + 1.4 * drag);
+    (this.ember.material as THREE.MeshBasicMaterial).color.setRGB(1, 0.42 + 0.4 * drag, 0.12 + 0.3 * drag);
+    const tip = this.ember.getWorldPosition(new THREE.Vector3());
+    // his left front foot follows the cigarette (fly space: he sits at the stool, unrotated)
+    const grip = this.cig.position.clone().sub(this.fly.root.position);
+    grip.y -= 0.02;
+    const hand = this.restL.clone().lerp(grip, reach);
+
+    if (T > 3.5 && !this.exhaled && this.dragged) {
+      this.exhaled = true;
+      this.puffs.forEach((p, i) => {
+        p.age = -i * 0.035;
+        p.life = 1.6 + Math.random() * 0.9;
+        p.sprite.position.set(0, SEAT + 0.88, -0.84);
+        p.vel.set((Math.random() - 0.5) * 0.5, 0.2 + Math.random() * 0.3, -(0.9 + Math.random() * 0.6));
+      });
+    }
+    for (const p of this.puffs) {
+      p.age += dt;
+      const mat = p.sprite.material as THREE.SpriteMaterial;
+      if (p.age < 0 || p.age > p.life) {
+        mat.opacity = 0;
+        continue;
+      }
+      p.sprite.position.addScaledVector(p.vel, dt);
+      p.vel.multiplyScalar(Math.max(0, 1 - 1.3 * dt));
+      p.vel.y += 0.12 * dt;
+      const size = 0.08 + p.age * 0.5;
+      p.sprite.scale.set(size, size, 1);
+      mat.opacity = 0.55 * Math.min(1, p.age * 8) * (1 - p.age / p.life);
+    }
+
+    // a thin thread off the ember that wavers, then breaks up and spreads under the lamp;
+    // it thins out while the cigarette is in his hand
     this.smoke.forEach((sp, i) => {
       const life = (this.t * 0.11 + i / this.smoke.length) % 1;
       const rise = life * 3.4;
       const sway = life * life * 0.55;
       sp.position.set(
-        -1.1 + sway * Math.sin(rise * 2.6 + this.t * 0.7) + 0.05 * Math.sin(i * 12.9),
-        COUNTER + 0.2 + rise,
-        -0.95 + sway * 0.6 * Math.cos(rise * 2.1 + this.t * 0.5 + i),
+        tip.x + sway * Math.sin(rise * 2.6 + this.t * 0.7) + 0.05 * Math.sin(i * 12.9),
+        tip.y + 0.02 + rise,
+        tip.z + sway * 0.6 * Math.cos(rise * 2.1 + this.t * 0.5 + i),
       );
       const size = 0.05 + life * life * 1.3;
       sp.scale.set(size, size * 1.3, 1);
-      (sp.material as THREE.SpriteMaterial).opacity = 0.7 * Math.min(1, life * 14) * (1 - life) ** 1.6;
+      (sp.material as THREE.SpriteMaterial).opacity = 0.7 * Math.min(1, life * 14) * (1 - life) ** 1.6 * (1 - 0.8 * lift);
     });
 
     this.fly.update(dt, {
-      pressL: this.restL,
+      pressL: hand,
       pressR: this.restR,
       reachL: 1,
       reachR: 1,
       proboscis: s.proboscis,
       startle: s.startle,
       buzz: s.startle * 0.5,
-      lookX: 0,
+      // he glances at the ashtray as he reaches for it
+      lookX: -0.6 * reach * (1 - 0.7 * lift),
       bob: s.talking ? 0.5 + 0.5 * Math.sin(this.t * 13) : 0,
       drunk: s.drunk,
     });
