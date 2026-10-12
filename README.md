@@ -35,9 +35,9 @@ and a whole connectome that really does decide when he drinks.
 > which parts are the wiring, which parts are engineering, and which parts were invented for the joke.
 
 <div align="center">
-  <img src="assets/barfly-flinch.jpg" width="760" alt="Barfly mid-flinch: wings up, eyes wide, the door open behind him, an empty mug on the bar, and a chat reading 'Rough night?' 'Just getting started.'">
+  <img src="assets/barfly-scene.jpg" width="1100" alt="Barfly drinking in a warm wood-paneled bar: scan-derived fly anatomy, expressive eyes, translucent veined wings, a textured counter, bottle shelves and the live neuron readouts.">
   <br/>
-  <sub>The door just banged. His escape neurons are at 245 spikes a second; nobody told him to jump.</sub>
+  <sub>The running browser scene. His mouth is in the mug because his mouth neurons are firing.</sub>
 </div>
 
 ## The premise
@@ -277,6 +277,25 @@ Stated plainly, as of the first commit:
 - **Grooming.** The third thing a fly at a bar ought to do. The engine this is built on tracks sugar and looming
   only.
 
+## His look
+
+The body now uses a bundled **GLB model** made from [NeuroMechFly / FlyGym's scan-derived fruit-fly meshes](https://neuromechfly.org/),
+with separate head, thorax, abdomen, wing and leg geometry. The source meshes are lightly smoothed and rescaled to
+Barfly's existing animation rig. His expressive eyes, lids, antennae and mouth animation remain theatrical additions.
+**This changes the picture, not the brain.** It does not run FlyGym's physics or add new sensory inputs.
+
+The counter uses [Wood Table by Dimitrios Savva / Poly Haven](https://polyhaven.com/a/wood_table), with local color and
+normal maps. Paneled walls, bottle shelves, pendant lamps, brass trim, richer glass and softer smoke fill out the room.
+The provenance text is under **What's real, what's made up**; all the original neuron readouts and settings remain available.
+
+Visual assets live in `public/art/`, including the standalone `fruit-fly.glb`, upstream Apache-2.0 license and a
+`sources.json` manifest with the pinned source revision and download hashes. They load locally and require no extra packages.
+To regenerate them from the original sources, run `npm run assets` (this command needs internet access).
+
+Checked on October 12, 2026: TypeScript and production build; the live browser's drink, empty-mug, door/flinch and
+timed smoking flows; desktop and 390-pixel-wide framing; Settings opening and closing. No browser JavaScript errors
+were recorded during those checks. Voice and language-model replies were not part of this visual check.
+
 ## Layout
 
 ```
@@ -289,7 +308,7 @@ barfly/
 │   ├── chat.ts           his mouth -- five providers, the body note, the first-draft persona
 │   ├── settings.ts       who speaks for him, with what key, in what voice, as whom
 │   ├── brain/            the whole-brain engine, from doodle-fly; +1 message to rescale GABA
-│   └── fly3d/            the procedural fly, from doodle-fly; + big eyes, lids, sag and sway
+│   └── fly3d/            scan-derived meshes on the doodle-fly rig; eyes, lids, sag and sway
 ├── scripts/
 │   ├── build_data.py     downloads and packs the connectome (from doodle-fly)
 │   └── drunk-probe.ts    the inhibition and dopamine tables above, headless
@@ -313,9 +332,13 @@ barfly/
 
 Almost none of the hard parts were written here. That is the point of the project and it should be said first.
 
-- **Brain engine, connectome packing and the 3D fly:** [dtecx/doodle-fly](https://github.com/dtecx/doodle-fly) (MIT).
+- **Brain engine, connectome packing and the animation rig:** [dtecx/doodle-fly](https://github.com/dtecx/doodle-fly) (MIT).
   A fruit fly's whole brain playing a jumping game in a browser tab, with an unusually careful account of what is
   wired and what is hand-made. Barfly is that fly with the game taken away. See [`LICENSE-doodle-fly`](LICENSE-doodle-fly).
+- **Body anatomy:** [NeuroMechFly / FlyGym](https://github.com/NeLy-EPFL/flygym), NeLy / EPFL (Apache-2.0).
+  Meshes derived from a real fly's micro-CT scan, converted to GLB and adapted for this character. See
+  [`public/art/LICENSE-NeuroMechFly.txt`](public/art/LICENSE-NeuroMechFly.txt) and [`public/art/sources.json`](public/art/sources.json).
+- **Wood material:** [Dimitrios Savva / Poly Haven, Wood Table](https://polyhaven.com/a/wood_table) (CC0).
 - **Connectome:** Dorkenwald, S. *et al.* Neuronal wiring diagram of an adult brain. *Nature* 634, 124–138 (2024);
   Schlegel, P. *et al.* Whole-brain annotation and multi-connectome cell typing of *Drosophila*. *Nature* 634,
   139–152 (2024). Cell types from [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations).
