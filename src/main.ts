@@ -4,6 +4,7 @@ import { BrainClient } from "./brain/client.ts";
 import { loadConfig, Mouth, speak, speakStranger } from "./chat.ts";
 import { setUpSettings } from "./settings.ts";
 import { TRACKED, type FrameResult, type ReadyInfo, type SensoryInput } from "./brain/protocol.ts";
+import { loadFlyAnatomy } from "./fly3d/anatomy.ts";
 
 const FRAME_MS = 1000 / 60;
 /** Poisson drive to the sugar taste neurons while there is beer in the mug */
@@ -20,6 +21,7 @@ const BUZZ_FADE_S = 600;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const brain = new BrainClient();
+await loadFlyAnatomy().catch((error: unknown) => console.warn("Fly anatomy could not load; using the original procedural fly.", error));
 const bar = new BarScene($<HTMLCanvasElement>("bar"));
 let info: ReadyInfo;
 
@@ -265,7 +267,9 @@ async function boot(): Promise<void> {
     `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. ` +
     `Strangers who fly in are the same fly model with no brain behind it, flown along a set path, and their lines are written by the same language model; the door that announces them is the same looming signal, so his flinch at them is his own. ` +
     `His words come from the language model picked in Settings, which is told what his body just did; his voice is your browser's or a local voice server's. Neither one touches his brain. ` +
-    `Brain engine and 3D fly from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
+    `Brain engine and animation rig from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
+    `Scan-derived body meshes from <a href="https://neuromechfly.org/">NeuroMechFly / FlyGym</a> (Apache-2.0), rescaled to fit this character; they do not change his brain or add a biomechanics simulation. ` +
+    `The wood material is <a href="https://polyhaven.com/a/wood_table">Wood Table by Dimitrios Savva / Poly Haven</a> (CC0). ` +
     `FlyWire data: CC BY-NC 4.0, Dorkenwald et al. and Schlegel et al., Nature 2024.`;
 
   $("pour").addEventListener("click", () => {

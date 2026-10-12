@@ -2,6 +2,12 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { FlyModel } from "./fly3d/fly.ts";
+import { dressRoom, labelTexture, woodMaterial } from "./bar-art.ts";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 export interface BarState {
   /** 0..1 from the proboscis motor neurons */
@@ -47,18 +53,23 @@ function signTexture(): THREE.Texture {
   c.width = 1024;
   c.height = 320;
   const g = c.getContext("2d")!;
-  g.fillStyle = "#2a0d0a";
+  g.fillStyle = "#14231c";
   g.fillRect(0, 0, c.width, c.height);
-  g.strokeStyle = "#b3261c";
-  g.lineWidth = 18;
+  g.strokeStyle = "#9c7841";
+  g.lineWidth = 7;
   g.strokeRect(20, 20, c.width - 40, c.height - 40);
-  g.font = "bold 210px Georgia, serif";
+  g.strokeRect(32, 32, c.width - 64, c.height - 64);
+  g.font = "bold 174px Georgia, serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.shadowColor = "#ffb347";
-  g.shadowBlur = 40;
+  g.shadowBlur = 14;
   g.fillStyle = "#ffd68a";
-  g.fillText("BARFLY", c.width / 2, c.height / 2 + 10);
+  g.fillText("BARFLY", c.width / 2, 145);
+  g.shadowBlur = 0;
+  g.font = "24px Georgia, serif";
+  g.fillStyle = "#bfa477";
+  g.fillText("A STOOL. A SMOKE. A BOTTOMLESS TAB.", c.width / 2, 254);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -91,11 +102,60 @@ function smokeTexture(): THREE.Texture {
   return new THREE.CanvasTexture(c);
 }
 
+function streetTexture(): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d")!;
+  const sky = ctx.createLinearGradient(0, 0, 0, 1024);
+  sky.addColorStop(0, "#0b1924");
+  sky.addColorStop(0.65, "#284351");
+  sky.addColorStop(1, "#10202c");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, 512, 1024);
+  for (let i = 0; i < 8; i++) {
+    const x = i * 76 - 40;
+    const top = 160 + ((i * 173) % 260);
+    ctx.fillStyle = i % 2 ? "#17242d" : "#0e1c26";
+    ctx.fillRect(x, top, 64, 670 - top);
+    for (let row = 0; row < 5; row++) {
+      ctx.fillStyle = (i + row) % 3 ? "#2a3b40" : "#b58e52";
+      ctx.fillRect(x + 18, top + 30 + row * 45, 12, 19);
+    }
+  }
+  for (const x of [110, 390]) {
+    const glow = ctx.createRadialGradient(x, 550, 4, x, 550, 105);
+    glow.addColorStop(0, "#f1d8a0");
+    glow.addColorStop(0.1, "#c3a76b80");
+    glow.addColorStop(1, "#c3a76b00");
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - 105, 445, 210, 210);
+    const reflection = ctx.createLinearGradient(0, 660, 0, 1024);
+    reflection.addColorStop(0, "#b6a16b88");
+    reflection.addColorStop(1, "#b6a16b00");
+    ctx.fillStyle = reflection;
+    ctx.fillRect(x - 8, 660, 16, 364);
+  }
+  ctx.strokeStyle = "#a0c7db35";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 120; i++) {
+    const x = (i * 131) % 512, y = (i * 227) % 1024;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 6, y + 28);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 export class BarScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;
+  private readonly composer: EffectComposer;
   private readonly fly = new FlyModel();
   private readonly beer: THREE.Mesh;
   private readonly foam: THREE.Mesh;
@@ -132,31 +192,50 @@ export class BarScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
-    this.scene.background = new THREE.Color("#0b0705");
-    this.scene.fog = new THREE.Fog("#0b0705", 9, 22);
+    this.scene.background = new THREE.Color("#101510");
+    this.scene.fog = new THREE.Fog("#101510", 14, 32);
+    const environment = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(environment, 0.04).texture;
+    this.scene.environmentIntensity = 0.1;
+    environment.dispose();
+    pmrem.dispose();
 
     this.camera = new THREE.PerspectiveCamera(34, 1, 0.05, 60);
-    this.camera.position.set(-3.6, SEAT + 2.3, -7.2);
+    this.camera.position.set(-3.5, SEAT + 2.1, -7.6);
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(1.2, SEAT + 1.0, 1.0);
+    this.controls.target.set(0.9, SEAT + 1.1, 1.0);
     this.controls.enablePan = false;
     this.controls.minDistance = 2.5;
     this.controls.maxDistance = 14;
     this.controls.maxPolarAngle = Math.PI * 0.52;
     this.controls.update();
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.08, 0.35, 2));
+    this.composer.addPass(new OutputPass());
 
-    const wood = new THREE.MeshStandardMaterial({ color: "#3b2113", roughness: 0.35, metalness: 0.1 });
-    const darkWood = new THREE.MeshStandardMaterial({ color: "#1f120b", roughness: 0.7 });
-    const wall = new THREE.MeshStandardMaterial({ color: "#1c2a22", roughness: 0.95 });
-    const leather = new THREE.MeshStandardMaterial({ color: "#5a1414", roughness: 0.5 });
-    const steel = new THREE.MeshStandardMaterial({ color: "#3a3532", roughness: 0.4, metalness: 0.8 });
+    const wood = woodMaterial();
+    const darkWood = wood.clone();
+    darkWood.color.set("#403126");
+    darkWood.roughness = 0.8;
+    const wall = new THREE.MeshStandardMaterial({ color: "#314038", roughness: 0.95 });
+    const leather = new THREE.MeshPhysicalMaterial({ color: "#4c2321", roughness: 0.66, sheen: 0.25 });
+    const steel = new THREE.MeshStandardMaterial({ color: "#655a4c", roughness: 0.42, metalness: 0.8 });
+    const brass = new THREE.MeshStandardMaterial({ color: "#b39458", roughness: 0.36, metalness: 0.85 });
 
     // room
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: "#16100c", roughness: 0.25, metalness: 0.3 }));
+    const floorMat = darkWood.clone();
+    floorMat.map = wood.map!.clone();
+    floorMat.map.repeat.set(12, 12);
+    floorMat.normalMap = null;
+    floorMat.roughnessMap = null;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
@@ -164,6 +243,7 @@ export class BarScene {
     back.position.set(0, 6, 6);
     back.rotation.y = Math.PI;
     this.scene.add(back);
+    dressRoom(this.scene, wood, brass);
 
     // counter: a slab that overhangs a recessed base
     const slab = new THREE.Mesh(new THREE.BoxGeometry(16, 0.14, 1.9), wood);
@@ -174,6 +254,14 @@ export class BarScene {
     const base = new THREE.Mesh(new THREE.BoxGeometry(16, COUNTER - 0.14, 1.2), darkWood);
     base.position.set(0, (COUNTER - 0.14) / 2, -1.7);
     this.scene.add(base);
+    const nosing = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 16, 20), wood);
+    nosing.rotation.z = Math.PI / 2;
+    nosing.position.set(0, COUNTER - 0.07, -2.34);
+    this.scene.add(nosing);
+    const footRail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 16, 16), brass);
+    footRail.rotation.z = Math.PI / 2;
+    footRail.position.set(0, 0.38, -0.77);
+    this.scene.add(footRail);
 
     // stools along the bar; his is the one at x = 0
     for (let i = -2; i <= 3; i++) {
@@ -187,58 +275,86 @@ export class BarScene {
       const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.06, 32), steel);
       foot.position.y = 0.03;
       stool.add(seat, post, foot);
+      const piping = new THREE.Mesh(new THREE.TorusGeometry(1.025, 0.018, 8, 48), leather);
+      piping.rotation.x = Math.PI / 2;
+      piping.position.y = SEAT - 0.015;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 8, 32), steel);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.55;
+      stool.add(piping, ring);
       stool.position.set(i * 2.6, 0, 0.3);
       this.scene.add(stool);
     }
 
     // the sign
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.6), new THREE.MeshBasicMaterial({ map: signTexture() }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.9, 1.22), new THREE.MeshBasicMaterial({ map: signTexture() }));
     sign.position.set(1.4, SEAT + 3.3, 5.95);
     sign.rotation.y = Math.PI;
     this.scene.add(sign);
-    const signGlow = new THREE.PointLight("#ffb347", 14, 9, 2);
+    const signGlow = new THREE.PointLight("#ffb347", 9, 9, 2);
     signGlow.position.set(1.4, SEAT + 3.2, 5.2);
     this.scene.add(signGlow);
 
     // the door, in the back wall to his right, with a wet street behind it
     const doorX = 5.6;
-    const street = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 4.2), new THREE.MeshBasicMaterial({ color: "#3d6ea8" }));
+    const street = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 4.2), new THREE.MeshBasicMaterial({ map: streetTexture() }));
     street.position.set(doorX, 2.1, 5.99);
     street.rotation.y = Math.PI;
     this.scene.add(street);
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.3, 4.5, 0.12), darkWood);
-    frame.position.set(doorX, 2.25, 6.02);
-    this.scene.add(frame);
+    for (const side of [-1, 1]) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 4.45, 0.18), wood);
+      frame.position.set(doorX + side * 1.08, 2.22, 5.84);
+      this.scene.add(frame);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.14, 0.18), wood);
+    lintel.position.set(doorX, 4.4, 5.84);
+    this.scene.add(lintel);
     this.doorHinge.position.set(doorX + 1.0, 0, 5.9);
     const leaf = new THREE.Mesh(new THREE.BoxGeometry(2.0, 4.2, 0.1), new THREE.MeshStandardMaterial({ color: "#2a1a10", roughness: 0.6 }));
     leaf.position.set(-1.0, 2.1, 0);
     leaf.castShadow = true;
     this.doorHinge.add(leaf);
+    const doorWindow = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 1.8), new THREE.MeshPhysicalMaterial({ color: "#233c45", roughness: 0.35, metalness: 0.3, clearcoat: 1 }));
+    doorWindow.position.set(-1, 2.75, -0.056);
+    doorWindow.rotation.y = Math.PI;
+    const doorKnob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), brass);
+    doorKnob.position.set(-1.75, 1.8, -0.11);
+    this.doorHinge.add(doorWindow, doorKnob);
     this.scene.add(this.doorHinge);
     this.rainLight = new THREE.PointLight("#7fb2e6", 0, 14, 1.6);
     this.rainLight.position.set(doorX, 2.4, 5.2);
     this.scene.add(this.rainLight);
 
     // light: one pendant over his stool, and just enough fill to read the room
-    this.scene.add(new THREE.HemisphereLight("#ffd9a8", "#120a06", 0.35));
-    const pendant = new THREE.SpotLight("#ffc27a", 90, 14, 0.75, 0.6, 1.6);
+    this.scene.add(new THREE.HemisphereLight("#dce2d5", "#31241b", 0.45));
+    const pendant = new THREE.SpotLight("#ffe0b0", 42, 14, 0.75, 0.7, 1.6);
     pendant.position.set(-0.4, SEAT + 4.2, -1.4);
     pendant.target.position.set(0, SEAT, -0.3);
     pendant.castShadow = true;
     pendant.shadow.mapSize.set(1024, 1024);
     this.scene.add(pendant, pendant.target);
-    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.45, 24, 1, true), steel);
-    shade.position.copy(pendant.position);
-    this.scene.add(shade);
-    const face = new THREE.PointLight("#ffb070", 5, 6, 2);
+    for (const x of [-3.3, -0.4, 2.7]) {
+      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.33, 32, 1, true), new THREE.MeshStandardMaterial({ color: "#264139", metalness: 0.65, roughness: 0.4, side: THREE.DoubleSide }));
+      shade.position.set(x, SEAT + 3.55, -1.2);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color("#fff0cf").multiplyScalar(3) }));
+      bulb.position.copy(shade.position).y -= 0.15;
+      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 2.5, 6), steel);
+      cable.position.set(x, SEAT + 4.95, -1.2);
+      this.scene.add(shade, bulb, cable);
+    }
+    const face = new THREE.PointLight("#ffdfb7", 4, 6, 2);
     face.position.set(-1.2, SEAT + 1.2, -2.6);
     this.scene.add(face);
+    const rimLight = new THREE.SpotLight("#aac9cc", 10, 12, 0.6, 0.85, 2);
+    rimLight.position.set(2.8, SEAT + 2.8, 2.2);
+    rimLight.target.position.set(0, SEAT + 1, 0);
+    this.scene.add(rimLight, rimLight.target);
 
     // the mug, under his mouth
     const mug = new THREE.Group();
     const glass = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.19, MUG_H, 32, 1, true),
-      new THREE.MeshStandardMaterial({ color: "#cfe3ea", roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.38, side: THREE.DoubleSide }),
+      new THREE.MeshPhysicalMaterial({ color: "#e8eee2", roughness: 0.08, transmission: 0.92, thickness: 0.035, ior: 1.48, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
     );
     glass.position.y = MUG_H / 2;
     // a rim and a thick base so the empty still reads as a mug on a dark bar
@@ -259,9 +375,13 @@ export class BarScene {
     mug.add(glass, this.beer, this.foam, handle);
     mug.position.set(0, COUNTER, -0.72);
     this.scene.add(mug);
+    const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.008, 40), new THREE.MeshStandardMaterial({ map: labelTexture("BARFLY", "ONE MORE"), color: "#c9ad7e", roughness: 1 }));
+    coaster.position.set(0, COUNTER + 0.004, -0.72);
+    this.scene.add(coaster);
 
     // smokes: ashtray, a lit cigarette, the pack
-    const ashtray = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.08, 28), new THREE.MeshStandardMaterial({ color: "#15130f", roughness: 0.3, metalness: 0.6 }));
+    const dish = [new THREE.Vector2(0, 0.014), new THREE.Vector2(0.23, 0.014), new THREE.Vector2(0.29, 0.075), new THREE.Vector2(0.3, 0.08), new THREE.Vector2(0.29, 0), new THREE.Vector2(0, 0)];
+    const ashtray = new THREE.Mesh(new THREE.LatheGeometry(dish, 40), new THREE.MeshStandardMaterial({ color: "#879286", roughness: 0.23, metalness: 0.65 }));
     ashtray.position.set(-1.05, COUNTER + 0.04, -0.95);
     this.scene.add(ashtray);
     // the cigarette is one piece so he can pick it up: filter at -y, ember at +y
@@ -269,6 +389,9 @@ export class BarScene {
     this.ember = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshBasicMaterial({ color: "#ff6a1f" }));
     this.ember.position.y = 0.21;
     this.cig.add(paper, this.ember);
+    const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.105, 12), new THREE.MeshStandardMaterial({ color: "#b99155", roughness: 0.8 }));
+    filter.position.y = -0.16;
+    this.cig.add(filter);
     this.cig.position.copy(CIG_REST);
     this.cig.rotation.z = CIG_REST_TILT;
     this.scene.add(this.cig);
@@ -276,6 +399,10 @@ export class BarScene {
     pack.position.set(-1.6, COUNTER + 0.05, -1.25);
     pack.rotation.y = 0.4;
     this.scene.add(pack);
+    const packLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.38), new THREE.MeshStandardMaterial({ map: labelTexture("LAST", "LIGHT"), roughness: 0.9 }));
+    packLabel.rotation.x = -Math.PI / 2;
+    packLabel.position.y = 0.051;
+    pack.add(packLabel);
     const smokeMat = smokeTexture();
     for (let i = 0; i < 44; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeMat, color: "#cfd6e2", transparent: true, depthWrite: false, opacity: 0 }));
@@ -301,7 +428,7 @@ export class BarScene {
     this.fly.root.position.set(0, SEAT, 0);
     this.scene.add(this.fly.root);
     this.fly.root.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) o.castShadow = true;
+      if ((o as THREE.Mesh).isMesh) o.castShadow = !((o as THREE.Mesh).material as THREE.Material).transparent;
     });
     // front feet rest on the counter either side of the mug (fly space)
     this.restL = new THREE.Vector3(-0.45, COUNTER - SEAT, -0.9);
@@ -314,7 +441,7 @@ export class BarScene {
     this.guest.root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = true;
+      mesh.castShadow = !(mesh.material as THREE.Material).transparent;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (mat.color && !this.guestColors.some((g) => g.mat === mat)) this.guestColors.push({ mat, base: mat.color.clone() });
     });
@@ -421,8 +548,10 @@ export class BarScene {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false);
+    this.composer.setSize(w, h);
     // keep the scene centred in the space the side panel leaves free
-    const panel = w > 700 ? Math.min(300, w - 32) + 16 : 0;
+    const panel = w > 700 ? Math.min(300, w - 32) + 16 : Math.min(110, w * 0.28);
+    this.camera.fov = w > 700 ? 34 : 38;
     this.camera.aspect = (w + panel) / h;
     this.camera.setViewOffset(w + panel, h, panel, 0, w, h);
     this.camera.updateProjectionMatrix();
@@ -523,9 +652,9 @@ export class BarScene {
         tip.y + 0.02 + rise,
         tip.z + sway * 0.6 * Math.cos(rise * 2.1 + this.t * 0.5 + i),
       );
-      const size = 0.05 + life * life * 1.3;
+      const size = 0.05 + life * life * 0.85;
       sp.scale.set(size, size * 1.3, 1);
-      (sp.material as THREE.SpriteMaterial).opacity = 0.7 * Math.min(1, life * 14) * (1 - life) ** 1.6 * (1 - 0.8 * lift);
+      (sp.material as THREE.SpriteMaterial).opacity = 0.4 * Math.min(1, life * 14) * (1 - life) ** 1.6 * (1 - 0.8 * lift);
     });
 
     this.fly.update(dt, {
@@ -545,6 +674,6 @@ export class BarScene {
     this.updateGuest(dt, s.guestTalking);
 
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render(dt);
   }
 }

@@ -1,10 +1,10 @@
 :root {
-  --ink: #f2dfbd;
-  --dim: #b39a74;
-  --amber: #f0a63a;
-  --rain: #7fb2e6;
-  --panel: rgba(18, 11, 7, 0.82);
-  --line: rgba(240, 166, 58, 0.25);
+  --ink: #eee4cf;
+  --dim: #b0ab96;
+  --amber: #d8b878;
+  --rain: #9dbfbe;
+  --panel: #141a16;
+  --line: #3c4436;
 }
 
 * {
@@ -17,7 +17,7 @@ body {
   height: 100%;
   background: #0b0705;
   color: var(--ink);
-  font: 15px/1.45 Georgia, "Times New Roman", serif;
+  font: 14px/1.5 "Segoe UI", sans-serif;
   overflow: hidden;
 }
 
@@ -56,30 +56,43 @@ body {
 
 #panel {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
+  top: 24px;
+  right: 24px;
   width: min(300px, calc(100vw - 32px));
-  padding: 18px;
+  max-height: calc(100dvh - 48px);
+  padding: 24px 20px 18px;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-top: 3px solid var(--amber);
+  box-shadow: 0 12px 35px #0006;
+  scrollbar-width: thin;
+  scrollbar-color: #59604a transparent;
   overflow-y: auto;
 }
 
 .card {
-  margin: 0 0 18px;
-  font-size: 19px;
-  line-height: 1.3;
+  margin: 0 0 22px;
+  font: 22px/1.25 Georgia, serif;
   color: var(--amber);
+}
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--dim);
 }
 
 .meters {
   margin: 0;
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 .meters dt {
-  font-size: 13px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
   color: var(--dim);
 }
 .meters dd {
@@ -90,14 +103,21 @@ body {
 }
 .bar {
   flex: 1;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.07);
+  height: 4px;
+  background: #2b322b;
 }
 .bar i {
   display: block;
   height: 100%;
   width: 0;
   background: var(--amber);
+  transition: width 90ms linear;
+}
+#m-sugar, #m-loom {
+  background: var(--rain);
+}
+#m-buzz {
+  background: #bd8b78;
 }
 .meters b {
   width: 62px;
@@ -106,8 +126,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .tag {
-  float: right;
-  font: 10px/1.6 ui-monospace, Consolas, monospace;
+  font: 8px/1.8 "Segoe UI", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -128,9 +147,14 @@ body {
 }
 
 .tab {
-  margin: 18px 0 0;
-  padding-top: 12px;
+  margin: 24px 0 0;
+  padding-top: 16px;
   border-top: 1px solid var(--line);
+  font: 17px Georgia, serif;
+}
+.tab b {
+  font-variant-numeric: tabular-nums;
+  color: var(--amber);
 }
 
 h2 {
@@ -145,7 +169,9 @@ h2 {
   margin: 0;
   padding: 0;
   list-style: none;
-  font: 12px/1.7 ui-monospace, Consolas, monospace;
+  font: 11px/1.9 "Segoe UI", sans-serif;
+  max-height: 150px;
+  overflow-y: auto;
 }
 #log li span {
   color: var(--dim);
@@ -153,9 +179,7 @@ h2 {
 }
 
 .fine {
-  margin: 18px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  margin: 12px 0 0;
   font-size: 11.5px;
   line-height: 1.5;
   color: var(--dim);
@@ -163,11 +187,21 @@ h2 {
 .fine a {
   color: inherit;
 }
+.provenance {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 11px;
+}
+.provenance summary {
+  cursor: pointer;
+}
 
 #dock {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
+  left: 24px;
+  bottom: 24px;
   width: min(460px, calc(100vw - 32px));
   display: grid;
   gap: 10px;
@@ -194,7 +228,7 @@ h2 {
 }
 #chat li.him {
   border-left-color: var(--amber);
-  font-size: 17px;
+  font: 18px/1.4 Georgia, serif;
 }
 #chat li.you {
   color: var(--dim);
@@ -219,6 +253,10 @@ h2 {
   background: var(--panel);
   border: 1px solid var(--line);
   padding: 10px 12px;
+  box-shadow: 0 3px 12px #0005;
+}
+#say-text::placeholder {
+  color: #b0ab96;
 }
 #say-text:focus-visible {
   outline: 2px solid var(--rain);
@@ -252,7 +290,7 @@ button.quiet {
   max-height: calc(100vh - 32px);
   padding: 22px;
   color: var(--ink);
-  background: #120b07;
+  background: var(--panel);
   border: 1px solid var(--amber);
 }
 #settings::backdrop {
@@ -297,7 +335,7 @@ button.quiet {
   width: 100%;
   font: inherit;
   color: var(--ink);
-  background: #1c120b;
+  background: #20261e;
   border: 1px solid var(--line);
   padding: 8px 10px;
 }
@@ -320,15 +358,25 @@ button.quiet {
   outline-offset: 2px;
 }
 button {
-  font: inherit;
+  font: 600 12px/1.5 "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--panel);
   border: 1px solid var(--amber);
   padding: 10px 16px;
+  min-height: 42px;
+  box-shadow: 0 3px 12px #0005;
   cursor: pointer;
 }
+#pour {
+  background: #d8b878;
+  color: #201b12;
+  border-color: #e7ca91;
+}
+#pour:hover {
+  background: #ebcb8a;
+}
 button:hover {
-  background: rgba(240, 166, 58, 0.18);
+  background: #30382b;
 }
 button:focus-visible {
   outline: 2px solid var(--rain);
@@ -341,10 +389,23 @@ button:focus-visible {
 
 @media (max-width: 700px) {
   #panel {
-    top: 16px;
+    top: 12px;
+    right: 12px;
     bottom: auto;
-    left: 16px;
+    left: 12px;
     width: auto;
-    max-height: 30vh;
+    max-height: 27dvh;
+    padding: 14px 16px;
   }
+  .eyebrow { margin-bottom: 6px; }
+  .card { font-size: 19px; margin-bottom: 16px; }
+  #dock { left: 12px; bottom: 12px; width: calc(100vw - 24px); }
+  #dock .row { gap: 8px; }
+  #chat { max-height: 18dvh; }
+  #settings { padding: 18px; }
+  .field { grid-template-columns: 68px 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar i { transition: none; }
 }

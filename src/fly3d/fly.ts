@@ -1,7 +1,8 @@
-// Procedural Drosophila melanogaster: faceted red eyes, striped abdomen, veined wings, six IK legs.
+// Scan-derived Drosophila shapes on the original character rig: expressive eyes, veined wings, six IK legs.
 // The fly faces -z, y is up, its right side is +x. One unit is roughly one millimetre... times two.
 import * as THREE from "three";
 import { abdomenTexture, eyeTextures, thoraxTexture, wingTexture } from "./textures.ts";
+import { anatomyGeometry } from "./anatomy.ts";
 
 export interface FlyAnim {
   /** foot targets for the two front legs; null = resting on the floor */
@@ -24,9 +25,10 @@ const Y = new THREE.Vector3(0, 1, 0);
 
 class Bone {
   readonly mesh: THREE.Mesh;
-  constructor(parent: THREE.Object3D, r0: number, r1: number, mat: THREE.Material) {
-    const geo = new THREE.CylinderGeometry(r1, r0, 1, 10, 1);
-    geo.translate(0, 0.5, 0);
+  constructor(parent: THREE.Object3D, r0: number, r1: number, mat: THREE.Material, anatomy: string) {
+    const cylinder = new THREE.CylinderGeometry(r1, r0, 1, 12, 1);
+    cylinder.translate(0, 0.5, 0);
+    const geo = anatomyGeometry(anatomy, cylinder, r0 * 2, 1, r0 * 1.7, "leg");
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.castShadow = true;
     parent.add(this.mesh);
@@ -59,12 +61,12 @@ class Leg {
   private readonly knee: THREE.Mesh;
   private readonly ankle: THREE.Mesh;
 
-  constructor(root: THREE.Object3D, def: LegDef, mat: THREE.Material, dark: THREE.Material) {
+  constructor(root: THREE.Object3D, def: LegDef, mat: THREE.Material, dark: THREE.Material, anatomy: string) {
     this.def = def;
-    this.coxa = new Bone(root, 0.075, 0.06, mat);
-    this.femur = new Bone(root, 0.06, 0.05, mat);
-    this.tibia = new Bone(root, 0.045, 0.035, mat);
-    this.tarsus = new Bone(root, 0.032, 0.022, dark);
+    this.coxa = new Bone(root, 0.06, 0.045, mat, `${anatomy}_coxa`);
+    this.femur = new Bone(root, 0.062, 0.042, mat, `${anatomy}_trochanterfemur`);
+    this.tibia = new Bone(root, 0.035, 0.023, mat, `${anatomy}_tibia`);
+    this.tarsus = new Bone(root, 0.022, 0.012, dark, `${anatomy}_tarsus1`);
     const jg = new THREE.SphereGeometry(1, 10, 8);
     this.knee = new THREE.Mesh(jg, dark);
     this.knee.scale.setScalar(0.058);
@@ -127,14 +129,18 @@ export class FlyModel {
   constructor() {
     const cuticle = new THREE.MeshPhysicalMaterial({
       map: thoraxTexture(),
-      roughness: 0.55,
-      sheen: 0.6,
+      bumpMap: thoraxTexture(),
+      bumpScale: 0.006,
+      roughness: 0.46,
+      clearcoat: 0.25,
+      clearcoatRoughness: 0.4,
+      sheen: 0.35,
       sheenColor: new THREE.Color("#f3d9a8"),
       sheenRoughness: 0.5,
     });
-    const headMat = new THREE.MeshStandardMaterial({ color: "#c49457", roughness: 0.6 });
-    const legMat = new THREE.MeshStandardMaterial({ color: "#9a6c36", roughness: 0.55 });
-    const legDark = new THREE.MeshStandardMaterial({ color: "#5e3f1c", roughness: 0.6 });
+    const headMat = new THREE.MeshPhysicalMaterial({ color: "#a87943", roughness: 0.5, clearcoat: 0.2 });
+    const legMat = new THREE.MeshPhysicalMaterial({ color: "#9a7146", roughness: 0.4, clearcoat: 0.2 });
+    const legDark = new THREE.MeshStandardMaterial({ color: "#4c3525", roughness: 0.6 });
     const black = new THREE.MeshStandardMaterial({ color: "#1b120a", roughness: 0.4 });
     const eyeTex = eyeTextures();
     eyeTex.map.repeat.set(5, 3);
@@ -142,16 +148,16 @@ export class FlyModel {
     const eyeMat = new THREE.MeshPhysicalMaterial({
       map: eyeTex.map,
       bumpMap: eyeTex.bump,
-      bumpScale: 2.5,
-      roughness: 0.28,
-      clearcoat: 0.6,
-      clearcoatRoughness: 0.35,
+      bumpScale: 0.002,
+      roughness: 0.3,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.15,
     });
 
     this.root.add(this.body);
 
     // thorax
-    const thorax = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), cuticle);
+    const thorax = new THREE.Mesh(anatomyGeometry("c_thorax", new THREE.SphereGeometry(1, 48, 32), 2, 2, 2), cuticle);
     thorax.scale.set(0.4, 0.37, 0.5);
     thorax.position.set(0, 1.0, 0);
     thorax.rotation.x = 0.15;
@@ -163,8 +169,8 @@ export class FlyModel {
     scut.position.set(0, 1.25, 0.36);
     this.body.add(scut);
     // macrochaetae (big bristles) on the scutum
-    const bristleGeo = new THREE.ConeGeometry(0.012, 0.34, 5);
-    bristleGeo.translate(0, 0.17, 0);
+    const bristleGeo = new THREE.ConeGeometry(0.006, 0.23, 5);
+    bristleGeo.translate(0, 0.115, 0);
     for (const [x, z, tilt] of [
       [-0.13, -0.18, 0.9],
       [0.13, -0.18, 0.9],
@@ -189,8 +195,8 @@ export class FlyModel {
     const abGeo = new THREE.SphereGeometry(1, 48, 40);
     abGeo.rotateX(Math.PI / 2);
     this.abdomen = new THREE.Mesh(
-      abGeo,
-      new THREE.MeshPhysicalMaterial({ map: abdomenTexture(), roughness: 0.5, sheen: 0.4, sheenColor: new THREE.Color("#ffe2b0") }),
+      anatomyGeometry("abdomen", abGeo, 2, 2, 2),
+      new THREE.MeshPhysicalMaterial({ map: abdomenTexture(), roughness: 0.48, clearcoat: 0.2, sheen: 0.3, sheenColor: new THREE.Color("#ffe2b0") }),
     );
     this.abdomen.scale.set(0.34, 0.31, 0.62);
     this.abdomen.position.set(0, 0.9, 0.78);
@@ -201,7 +207,7 @@ export class FlyModel {
     // head with compound eyes, ocelli, antennae, proboscis
     this.head.position.set(0, 1.13, -0.55);
     this.body.add(this.head);
-    const capsule = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), headMat);
+    const capsule = new THREE.Mesh(anatomyGeometry("c_head", new THREE.SphereGeometry(1, 40, 28), 2, 2, 2), headMat);
     capsule.scale.set(0.29, 0.26, 0.21);
     capsule.castShadow = true;
     this.head.add(capsule);
@@ -216,29 +222,34 @@ export class FlyModel {
     }
     // Barfly addition: big expressive eyes where the compound eyes were. The red faceted
     // compound-eye surface survives as the iris.
-    const R = 0.155;
-    const white = new THREE.MeshStandardMaterial({ color: "#f4ecd8", roughness: 0.3 });
-    const dark = new THREE.MeshStandardMaterial({ color: "#150d08", roughness: 0.3 });
-    const lidMat = new THREE.MeshStandardMaterial({ color: "#a8602f", roughness: 0.65 });
+    const R = 0.17;
+    const white = new THREE.MeshPhysicalMaterial({ color: "#f6edda", roughness: 0.24, clearcoat: 0.8, clearcoatRoughness: 0.15 });
+    const dark = new THREE.MeshPhysicalMaterial({ color: "#100a08", roughness: 0.14, clearcoat: 1 });
+    const lidMat = new THREE.MeshStandardMaterial({ color: "#91643e", roughness: 0.65 });
     for (const side of [-1, 1] as const) {
       const ball = new THREE.Group();
-      ball.position.set(side * 0.19, 0.03, -0.09);
-      ball.rotation.y = -side * 0.28;
+      ball.position.set(side * 0.2, 0.03, -0.13);
+      ball.rotation.y = -side * 0.18;
       const eyeball = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 28), white);
       eyeball.castShadow = true;
       ball.add(eyeball);
       const gaze = new THREE.Group();
-      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.08, 28, 20), eyeMat);
-      iris.position.set(0, 0, -0.083);
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.04, 18, 14), dark);
-      pupil.position.set(0, 0, -0.128);
-      gaze.add(iris, pupil);
+      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.085, 32, 24), eyeMat);
+      iris.scale.z = 0.4;
+      iris.position.set(0, 0, -0.146);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.043, 24, 18), dark);
+      pupil.scale.z = 0.3;
+      pupil.position.set(0, 0, -0.176);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), new THREE.MeshBasicMaterial({ color: "#fff3db" }));
+      glint.scale.z = 0.3;
+      glint.position.set(-0.017, 0.024, -0.184);
+      gaze.add(iris, pupil, glint);
       ball.add(gaze);
       // upper lid: a top hemisphere that tips forward to close
       const lid = new THREE.Mesh(new THREE.SphereGeometry(R + 0.024, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), lidMat);
       ball.add(lid);
       // lower lid: a bottom hemisphere tipped back so only a bag shows under the eye
-      const lower = new THREE.Mesh(new THREE.SphereGeometry(R + 0.02, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), lidMat);
+      const lower = new THREE.Mesh(new THREE.SphereGeometry(R + 0.024, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), lidMat);
       ball.add(lower);
       const brow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.05), dark);
       brow.position.set(0, R + 0.05, -0.07);
@@ -249,7 +260,7 @@ export class FlyModel {
     }
     for (const side of [-1, 1] as const) {
       const ant = new THREE.Group();
-      ant.position.set(side * 0.055, 0.07, -0.19);
+      ant.position.set(side * 0.065, 0.15, -0.19);
       ant.rotation.set(0.5, 0, side * -0.25);
       const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.07, 8), headMat);
       seg1.position.y = -0.03;
@@ -296,18 +307,22 @@ export class FlyModel {
     shape.bezierCurveTo(-0.16, 0.25, -0.27, 0.8, -0.2, 1.22);
     shape.bezierCurveTo(-0.14, 1.42, 0.12, 1.45, 0.2, 1.25);
     shape.bezierCurveTo(0.26, 1.0, 0.16, 0.4, 0.04, 0.02);
-    const wingGeo = new THREE.ShapeGeometry(shape, 24);
+    const wingGeo = anatomyGeometry("l_wing", new THREE.ShapeGeometry(shape, 24), 0.56, 0.015, 1.45, "wing");
     const pos = wingGeo.attributes.position;
     const uv = wingGeo.attributes.uv;
-    for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getY(i) / 1.45, (pos.getX(i) + 0.28) / 0.56);
-    wingGeo.rotateX(Math.PI / 2);
+    if (wingGeo.type === "ShapeGeometry") {
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getY(i) / 1.45, (pos.getX(i) + 0.28) / 0.56);
+      wingGeo.rotateX(Math.PI / 2);
+    }
     const wingMat = new THREE.MeshPhysicalMaterial({
       map: wingTexture(),
+      color: "#b8c8b9",
       transparent: true,
+      opacity: 0.65,
       side: THREE.DoubleSide,
-      roughness: 0.15,
+      roughness: 0.45,
       metalness: 0,
-      iridescence: 1,
+      iridescence: 0.2,
       iridescenceIOR: 1.35,
       iridescenceThicknessRange: [200, 600],
       depthWrite: false,
@@ -339,7 +354,7 @@ export class FlyModel {
         { hip: v(0.17 * s, 0.7, -0.03), coxaDir: v(0.6 * s, -1, 0).normalize(), lens: [0.17, 0.56, 0.62, 0.42], foot: v(0.95 * s, 0, -0.18), tarsusDir: v(s, -0.25, -0.15).normalize(), side: s, front: false },
         { hip: v(0.16 * s, 0.72, 0.2), coxaDir: v(0.5 * s, -1, 0.35).normalize(), lens: [0.18, 0.62, 0.66, 0.46], foot: v(0.78 * s, 0, 0.78), tarsusDir: v(0.55 * s, -0.25, 1).normalize(), side: s, front: false },
       ];
-      for (const d of defs) this.legs.push(new Leg(this.root, d, legMat, legDark));
+      defs.forEach((d, i) => this.legs.push(new Leg(this.root, d, legMat, legDark, ["lf", "lm", "lh"][i])));
     }
   }
 
@@ -376,7 +391,8 @@ export class FlyModel {
       e.lower.rotation.x = -0.72 + 0.03 * d - 0.25 * this.startle;
       e.gaze.rotation.y = this.look * 0.25 + 0.3 * lazy;
       e.gaze.rotation.x = -0.1 + 0.12 * this.startle - 0.04 * d + 0.15 * lazy;
-      e.pupil.scale.setScalar(1 - 0.3 * this.startle + 0.3 * d);
+      const dilation = 1 - 0.3 * this.startle + 0.3 * d;
+      e.pupil.scale.set(dilation, dilation, 0.3 * dilation);
       e.brow.position.y = 0.205 + 0.05 * this.startle - 0.02 * d;
       e.brow.rotation.z = e.side * (0.3 - 0.55 * this.startle - 0.45 * d);
     }

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "data": "uv run scripts/build_data.py",
+    "assets": "node scripts/build-visual-assets.mjs",
     "probe:drunk": "node scripts/drunk-probe.ts",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit"
