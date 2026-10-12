@@ -448,12 +448,17 @@ export async function useFoundProps(
     for (const part of builtCigarette) part.visible = false;
   }, () => {});
 
-  // clean glasses lined up on our side of the bar
-  void prop("bar_glasses.glb", size => 0.46 / size.y).then(glasses => {
-    const glass = new THREE.MeshPhysicalMaterial({ color: "#e4ede6", roughness: 0.07, transmission: 0.9, thickness: 0.03, ior: 1.48, transparent: true, opacity: 0.55 });
+  // clean glasses on their own shelf on the back wall, above the bottles
+  void prop("bar_glasses.glb", size => 0.6 / size.y).then(glasses => {
+    const glass = new THREE.MeshPhysicalMaterial({ color: "#e4ede6", roughness: 0.07, transmission: 0.9, thickness: 0.03, ior: 1.48, transparent: true, opacity: 0.6 });
     glasses.traverse(o => { if (o instanceof THREE.Mesh) o.material = glass; });
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.11, 0.58), new THREE.MeshStandardMaterial({ color: "#3a2314", roughness: 0.6 }));
+    shelf.position.set(3.3, 4.1, 5.55);
+    shelf.castShadow = true;
     glasses.rotation.y = Math.PI / 2;
-    glasses.position.set(-2.75, counterY, -1.5);
-    scene.add(glasses);
+    glasses.position.set(3.3, 4.155, 5.42);
+    const glow = new THREE.PointLight("#ffbc7a", 2.5, 3.5, 2);
+    glow.position.set(3.3, 4.85, 5.1);
+    scene.add(shelf, glasses, glow);
   }, () => {});
 }
