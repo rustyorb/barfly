@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export function woodMaterial(): THREE.MeshStandardMaterial {
   const loader = new THREE.TextureLoader();
@@ -240,6 +241,8 @@ export function bartenderHand(): THREE.Group {
 
   // the mug hangs between the tips of the forefinger and thumb; this is the hand's place relative to its base
   hand.userData.grip = new THREE.Vector3(0.52, 1.14, 0.3);
+  hand.userData.scale = 0.8;
+  hand.userData.tilt = 0;
   hand.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
   hand.visible = false;
   return hand;
@@ -298,4 +301,104 @@ export function dressRoom(scene: THREE.Scene, wood: THREE.MeshStandardMaterial, 
   board.position.set(-6.5, 3.35, 5.79);
   board.rotation.y = Math.PI;
   scene.add(board);
+}
+
+/** how long the scanned hand and forearm are in the scene, fingertip to cut end */
+const SCAN_LENGTH = 3.3;
+/** which way the scan's palm faces in its own file: +1 for +z, -1 for -z */
+const SCAN_PALM = 1;
+
+/**
+ * Swap the built hand for a scan of a real one, if the file is there. "Hand-arm" by Thunk3D scanner
+ * (CC BY 4.0), reduced from 3.1 million triangles to about 63,000. It is an open, flat hand, so it
+ * does not pick the mug up: it slides it across the bar with its fingertips.
+ *
+ * The hand keeps the same frame as the built one: forearm toward +x, fingers toward -x, palm down.
+ * Its origin is at the fingertips.
+ */
+export async function useScannedHand(hand: THREE.Group): Promise<void> {
+  const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}art/hand-arm.glb`);
+  const scan = gltf.scene;
+  // the scan's own material is half metal; skin is not
+  const skin = new THREE.MeshPhysicalMaterial({ color: "#c69473", roughness: 0.58, sheen: 0.3, sheenColor: new THREE.Color("#f0c2a4") });
+  scan.traverse(o => {
+    if (o instanceof THREE.Mesh) {
+      o.material = skin;
+      o.castShadow = true;
+    }
+  });
+
+  // In the file the fingers point up (+y) and the palm faces along z. Lay it down: fingers to -x, palm to the bar.
+  const laid = new THREE.Group();
+  laid.add(scan);
+  const layDown = new THREE.Quaternion()
+    .setFromAxisAngle(new THREE.Vector3(1, 0, 0), (SCAN_PALM * Math.PI) / 2)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
+  laid.quaternion.copy(layDown);
+
+  // every vertex of the scan, in the laid-down frame
+  const points = (): THREE.Vector3[] => {
+    laid.updateMatrixWorld(true);
+    const out: THREE.Vector3[] = [];
+    scan.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const pos = o.geometry.getAttribute("position");
+      for (let n = 0; n < pos.count; n += 3) out.push(new THREE.Vector3().fromBufferAttribute(pos, n).applyMatrix4(o.matrixWorld));
+    });
+    return out;
+  };
+  const centroid = (list: THREE.Vector3[]) => list.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(Math.max(1, list.length));
+  const ends = (list: THREE.Vector3[]) => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const v of list) {
+      lo = Math.min(lo, v.x);
+      hi = Math.max(hi, v.x);
+    }
+    const slab = (hi - lo) * 0.06;
+    return { lo, hi, tips: list.filter(v => v.x < lo + slab), cut: list.filter(v => v.x > hi - slab) };
+  };
+
+  // the arm was scanned at a lean; straighten it so fingertips-to-forearm runs dead along +x
+  const first = ends(points());
+  const lean = centroid(first.cut).sub(centroid(first.tips)).normalize();
+  laid.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(lean, new THREE.Vector3(1, 0, 0)).multiply(layDown));
+
+  const all = points();
+  const { lo, hi, tips } = ends(all);
+  const k = SCAN_LENGTH / (hi - lo);
+  const tip = centroid(tips);
+  const tipFloor = Math.min(...tips.map(v => v.y));
+  // how thick the forearm is near its cut end, so the sleeve fits it
+  const girth = new THREE.Box3();
+  for (const v of all) if (v.x > hi - (hi - lo) * 0.15) girth.expandByPoint(v);
+  const fitted = new THREE.Group();
+  fitted.add(laid);
+  fitted.scale.setScalar(k);
+  // the fingertips at the origin, their undersides resting at y = 0
+  fitted.position.set(-lo * k, -tipFloor * k, -tip.z * k);
+  const cut = centroid(ends(all).cut).multiplyScalar(k).add(fitted.position);
+  const thick = Math.max(girth.max.y - girth.min.y, girth.max.z - girth.min.z) * k;
+
+  // a rolled shirt sleeve over the cut end of the forearm
+  const cloth = new THREE.MeshStandardMaterial({ color: "#e6dfc8", roughness: 0.9 });
+  const sleeve = new THREE.Group();
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(thick * 0.6, thick * 0.57, 0.3, 28), cloth);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(thick * 0.7, thick * 0.62, 1.8, 28), cloth);
+  arm.position.y = 1.0;
+  const band = new THREE.Mesh(new THREE.TorusGeometry(thick * 0.66, 0.03, 8, 28), new THREE.MeshStandardMaterial({ color: "#16130f", roughness: 0.5 }));
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 0.8;
+  sleeve.add(cuff, arm, band);
+  sleeve.rotation.z = -Math.PI / 2;
+  sleeve.position.set(cut.x - 0.3, cut.y, cut.z);
+  sleeve.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
+
+  for (const child of [...hand.children]) hand.remove(child);
+  hand.add(fitted, sleeve);
+  // fingertips against the side of the mug nearest us, a little above the bar
+  hand.userData.grip = new THREE.Vector3(0.2, 0.06, 0);
+  hand.userData.scale = 1;
+  // wrist higher than the fingertips, the way an arm reaches down onto a counter
+  hand.userData.tilt = 0.16;
 }

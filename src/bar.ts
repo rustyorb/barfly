@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { FlyModel } from "./fly3d/fly.ts";
-import { bartenderHand, dressRegularCorner, dressRoom, labelTexture, woodMaterial } from "./bar-art.ts";
+import { bartenderHand, dressRegularCorner, dressRoom, labelTexture, useScannedHand, woodMaterial } from "./bar-art.ts";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -54,7 +54,7 @@ const SERVE_FROM = new THREE.Vector3(-0.9, COUNTER + 0.7, -5.6);
 const SERVE_MUG_START = new THREE.Vector3(-0.25, COUNTER + 0.55, -2.3);
 /** the hand reaches away from us: its forearm points back toward the camera */
 const SERVE_YAW = Math.PI / 2 - 0.18;
-const HAND_SCALE = 0.8;
+
 const MUG_REST = new THREE.Vector3(0, COUNTER, -0.72);
 
 function signTexture(): THREE.Texture {
@@ -399,6 +399,8 @@ export class BarScene {
     mug.position.copy(MUG_REST);
     this.scene.add(mug);
     this.scene.add(this.bartender);
+    // a scan of a real hand, if the file is present; otherwise the built one stays
+    void useScannedHand(this.bartender).catch(() => {});
     this.spill = dressRegularCorner(this.scene, COUNTER);
     const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.008, 40), new THREE.MeshStandardMaterial({ map: labelTexture("BARFLY", "RESERVED SINCE FOREVER"), color: "#c9ad7e", roughness: 1 }));
     coaster.position.set(0, COUNTER + 0.004, -0.72);
@@ -508,10 +510,11 @@ export class BarScene {
     const place = ease((T - 0.8) / 0.9);
     this.mug.position.lerpVectors(SERVE_FROM, SERVE_MUG_START, approach).lerp(MUG_REST, place);
     this.mug.rotation.z = 0.04 * Math.sin(T * 5) * (1 - place);
-    this.bartender.rotation.set(0, SERVE_YAW, 0);
-    this.bartender.scale.setScalar(HAND_SCALE);
+    const handScale = (this.bartender.userData.scale as number) ?? 1;
+    this.bartender.rotation.set(0, SERVE_YAW, (this.bartender.userData.tilt as number) ?? 0);
+    this.bartender.scale.setScalar(handScale);
     // where the hand has to be for the mug to sit in its grip, turned to match the hand
-    const offset = (this.bartender.userData.grip as THREE.Vector3).clone().multiplyScalar(HAND_SCALE).applyEuler(this.bartender.rotation);
+    const offset = (this.bartender.userData.grip as THREE.Vector3).clone().multiplyScalar(handScale).applyEuler(this.bartender.rotation);
     this.bartender.position.copy(this.mug.position).add(offset);
     if (T > 0.75 && !this.handLoomed) {
       this.handLoomed = true;

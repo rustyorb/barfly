@@ -362,6 +362,7 @@ Almost none of the hard parts were written here. That is the point of the projec
   Meshes derived from a real fly's micro-CT scan, converted to GLB and adapted for this character. See
   [`public/art/LICENSE-NeuroMechFly.txt`](public/art/LICENSE-NeuroMechFly.txt) and [`public/art/sources.json`](public/art/sources.json).
 - **Wood material:** [Dimitrios Savva / Poly Haven, Wood Table](https://polyhaven.com/a/wood_table) (CC0).
+- **The bartender's hand:** [Hand-arm by Thunk3D scanner](https://sketchfab.com/3d-models/hand-arm-199e194fb33846e29e9f5a1a58f0b94b) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), a scan of a real hand, reduced from 3.1 million triangles to about 63,000. Changes are listed in [`public/art/sources.json`](public/art/sources.json).
 - **Connectome:** Dorkenwald, S. *et al.* Neuronal wiring diagram of an adult brain. *Nature* 634, 124–138 (2024);
   Schlegel, P. *et al.* Whole-brain annotation and multi-connectome cell typing of *Drosophila*. *Nature* 634,
   139–152 (2024). Cell types from [flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations).
