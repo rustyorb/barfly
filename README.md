@@ -282,7 +282,7 @@ Stated plainly, as of the first commit:
 The body now uses a bundled **GLB model** made from [NeuroMechFly / FlyGym's scan-derived fruit-fly meshes](https://neuromechfly.org/),
 with separate head, thorax, abdomen, wing and leg geometry. The source meshes are lightly smoothed and rescaled to
 Barfly's existing animation rig. His expressive eyes, lids, antennae and mouth animation remain theatrical additions.
-**This changes the picture, not the brain.** It does not run FlyGym's physics or add new sensory inputs.
+**This changes the picture, not the connectome.** It does not run FlyGym's physics or alter the brain's wiring.
 
 The counter uses [Wood Table by Dimitrios Savva / Poly Haven](https://polyhaven.com/a/wood_table), with local color and
 normal maps. Paneled walls, bottle shelves, pendant lamps, brass trim, richer glass and softer smoke fill out the room.
@@ -295,6 +295,29 @@ To regenerate them from the original sources, run `npm run assets` (this command
 Checked on October 12, 2026: TypeScript and production build; the live browser's drink, empty-mug, door/flinch and
 timed smoking flows; desktop and 390-pixel-wide framing; Settings opening and closing. No browser JavaScript errors
 were recorded during those checks. Voice and language-model replies were not part of this visual check.
+
+### Life at the world's smallest dive bar
+
+- **A bartender's enormous hand** carries in each beer and sets it on his coaster. Its approach sends the same
+  looming stimulus used by the door; the escape neurons determine whether he flinches. The taste stimulus starts
+  after the mug is placed, and beer still leaves it only through his mouth-neuron output.
+- **Drunk cigarette mistakes:** he occasionally misses his mouth, turns the cigarette around to inspect the lit
+  end, corrects himself, and takes a drag. A real flinch interrupts the routine and makes him put it down.
+- **Visitors with questionable flying skills:** they overshoot the stool, loop back, and land with dignity.
+  **Company** invites one immediately. With no language model selected, visitors can stop by silently; with a model,
+  the original two-line conversation flow remains available. Automatic visits still follow the Company setting.
+- **His reserved corner:** a stained coaster, a brass RESERVED / HE LIVES HERE sign, a crimped bottle-cap ashtray,
+  and an unpaid receipt that grows with his tab. Small glossy beer spills and soft contact shadows settle the props
+  onto the counter.
+- **Occasional captions**, including "He has reconsidered absolutely nothing." They are written bar jokes,
+  separate from his language-model dialogue.
+
+The cigarette routine, visitor choreography, bartender choreography, props and captions are theatrical additions.
+They do not implement nicotine pharmacology, new behavioral circuits, or a brain for the visitors. The bartender
+reuses the existing looming input, while the drinking and escape outputs still come from the existing simulation.
+Checked on October 12, 2026: production build; delivery and visitor lifecycle checks; drunk cigarette recovery and
+interruption checks; live hand/flinch, drinking, cigarette mishap and silent visitor flows. Model and voice replies
+remain outside these checks. The 390-pixel phone view also fits the controls and widens to show both flies during visits.
 
 ## Layout
 
