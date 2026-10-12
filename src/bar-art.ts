@@ -141,37 +141,105 @@ export function dressRegularCorner(scene: THREE.Scene, counter: number): THREE.G
   return spill;
 }
 
+/**
+ * The bartender's hand: a palm, four jointed fingers with knuckles and nails, a thumb, a forearm and a
+ * shirt cuff. It is a person's hand, so it is huge next to his mug, and it carries the mug the only way
+ * it can: pinched between forefinger and thumb, little finger out.
+ *
+ * Local frame: the forearm runs off toward +x, the fingers point toward -x, and positive curl bends a
+ * joint downward (toward -y). `userData.grip` is where the hand sits relative to the mug's base.
+ */
 export function bartenderHand(): THREE.Group {
   const hand = new THREE.Group();
-  const skin = new THREE.MeshPhysicalMaterial({ color: "#bd8c6d", roughness: 0.7, sheen: 0.18 });
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), skin);
-  palm.scale.set(0.46, 0.23, 0.37);
+  const skin = new THREE.MeshPhysicalMaterial({ color: "#c08f6f", roughness: 0.62, sheen: 0.25, sheenColor: new THREE.Color("#e8b89a") });
+  const nail = new THREE.MeshStandardMaterial({ color: "#ecd2c2", roughness: 0.35 });
+  const cloth = new THREE.MeshStandardMaterial({ color: "#e6dfc8", roughness: 0.9 });
+  const garter = new THREE.MeshStandardMaterial({ color: "#16130f", roughness: 0.5 });
+
+  // a bone: a capsule lying along -x from the joint it hangs off
+  const bone = (r: number, len: number) => {
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(0.01, len - r), 6, 14), skin);
+    m.rotation.z = Math.PI / 2;
+    m.position.x = -len / 2;
+    return m;
+  };
+
+  // a digit: three bones, each hanging off the end of the last, each bent by its own curl
+  const digit = (r: number, lens: number[], curls: number[]) => {
+    const root = new THREE.Group();
+    let joint = root;
+    lens.forEach((len, k) => {
+      if (k > 0) {
+        const next = new THREE.Group();
+        next.position.x = -lens[k - 1];
+        joint.add(next);
+        joint = next;
+      }
+      joint.rotation.z = curls[k];
+      const taper = 1 - 0.09 * k;
+      joint.add(bone(r * taper, len));
+      const knuckle = new THREE.Mesh(new THREE.SphereGeometry(r * taper * 1.12, 14, 10), skin);
+      joint.add(knuckle);
+      if (k === lens.length - 1) {
+        const plate = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), nail);
+        plate.scale.set(len * 0.3, r * 0.18, r * 0.72);
+        plate.position.set(-len * 0.66, r * taper * 0.86, 0);
+        joint.add(plate);
+      }
+    });
+    return root;
+  };
+
+  // palm: a slab, a little thicker at the heel
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), skin);
+  palm.scale.set(0.52, 0.17, 0.46);
   hand.add(palm);
-  const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.9, 8, 16), skin);
-  wrist.rotation.z = -Math.PI / 2;
-  wrist.position.x = 0.72;
-  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.26, 0.25, 24), new THREE.MeshStandardMaterial({ color: "#e0d8bc", roughness: 0.85 }));
-  sleeve.rotation.z = Math.PI / 2;
-  sleeve.position.x = 0.89;
-  hand.add(wrist, sleeve);
-  for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Group();
-    finger.position.set(-0.29, 0, -0.27 + i * 0.17);
-    const length = 0.32 + Math.sin((i + 1) * Math.PI / 5) * 0.11;
-    const first = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, length, 6, 12), skin);
-    first.rotation.z = Math.PI / 2 + 0.15;
-    first.position.x = -length / 2;
-    const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.078, 0.19, 6, 12), skin);
-    tip.rotation.z = -0.45;
-    tip.position.set(-length, -0.15, 0);
-    finger.add(first, tip);
-    hand.add(finger);
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), skin);
+  heel.scale.set(0.3, 0.19, 0.4);
+  heel.position.set(0.3, -0.03, 0);
+  hand.add(heel);
+
+  // fingers, from the thumb side (toward the camera, -z) to the little finger
+  const fingers: [number, number, number, number[], number[]][] = [
+    [-0.4, -0.3, 0.085, [0.42, 0.3, 0.24], [0.9, 0.5, 0.3]], // forefinger: down onto the mug
+    [-0.43, -0.1, 0.09, [0.46, 0.32, 0.25], [1.45, 1.55, 1.1]], // middle: tucked away
+    [-0.41, 0.1, 0.085, [0.42, 0.3, 0.24], [1.4, 1.5, 1.1]], // ring: tucked away
+    [-0.35, 0.29, 0.07, [0.33, 0.23, 0.2], [-0.3, 0.12, 0.1]], // little finger: out, like he was raised right
+  ];
+  for (const [x, z, r, lens, curls] of fingers) {
+    const f = digit(r, lens, curls);
+    f.position.set(x, 0, z);
+    hand.add(f);
   }
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.3, 8, 16), skin);
-  thumb.rotation.set(0.45, 0, -0.65);
-  thumb.position.set(-0.22, -0.2, 0.38);
+
+  // thumb: comes off the side of the heel and reaches under to meet the forefinger across the mug
+  const thumb = digit(0.1, [0.5, 0.42], [0, 0.28]);
+  thumb.position.set(0.18, -0.04, -0.4);
+  thumb.quaternion.setFromUnitVectors(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(-0.42, -0.88, 0.2).normalize());
   hand.add(thumb);
-  hand.scale.setScalar(1.65);
+
+  // wrist and forearm, rising back toward wherever the bartender is standing
+  const arm = new THREE.Group();
+  arm.position.x = 0.42;
+  arm.rotation.z = -0.3;
+  const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 1.5, 8, 18), skin);
+  forearm.rotation.z = Math.PI / 2;
+  forearm.scale.set(1, 1, 0.86);
+  forearm.position.x = 0.85;
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.31, 0.34, 28), cloth);
+  cuff.rotation.z = Math.PI / 2;
+  cuff.position.x = 1.25;
+  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 3.2, 28), cloth);
+  sleeve.rotation.z = Math.PI / 2;
+  sleeve.position.x = 3.0;
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.03, 8, 28), garter);
+  band.rotation.y = Math.PI / 2;
+  band.position.x = 2.6;
+  arm.add(forearm, cuff, sleeve, band);
+  hand.add(arm);
+
+  // the mug hangs between the tips of the forefinger and thumb; this is the hand's place relative to its base
+  hand.userData.grip = new THREE.Vector3(0.52, 1.14, 0.3);
   hand.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
   hand.visible = false;
   return hand;

@@ -503,7 +503,7 @@ export class BarScene {
     const place = ease((T - 0.8) / 0.9);
     this.mug.position.lerpVectors(new THREE.Vector3(4.82, COUNTER + 1.96, -0.78), SERVE_MUG_START, approach).lerp(MUG_REST, place);
     this.mug.rotation.z = 0.04 * Math.sin(T * 5) * (1 - place);
-    const grip = this.mug.position.clone().add(new THREE.Vector3(0.68, 0.34, 0.08));
+    const grip = this.mug.position.clone().add(this.bartender.userData.grip as THREE.Vector3);
     this.bartender.position.copy(grip);
     this.bartender.rotation.set(0.05, -0.1, -0.08 * (1 - place));
     if (T > 0.75 && !this.handLoomed) {
