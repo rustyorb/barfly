@@ -8,6 +8,7 @@
   </head>
   <body>
     <canvas id="bar" aria-label="A fruit fly sitting at a bar"></canvas>
+    <p id="bar-caption" aria-live="polite" hidden></p>
 
     <div id="loading">
       <p id="loading-stage">Waking him up</p>
@@ -65,6 +66,7 @@
       <div class="row">
         <button id="pour" type="button">Pour him one</button>
         <button id="door" type="button">Bang the door</button>
+        <button id="company" type="button">Company</button>
         <button id="open-settings" type="button" class="quiet">Settings</button>
       </div>
       <div class="row settings">
@@ -92,7 +94,7 @@
 
       <h3>Company</h3>
       <label class="check"><input id="set-visitors" type="checkbox" /> Let a stranger walk in now and then and say something to him</label>
-      <p class="help">Every couple of minutes. Each visit is two short requests to the language model above.</p>
+      <p class="help">Every couple of minutes, or press Company. With a language model, each visit is two short requests; without one, they quietly stop by.</p>
 
       <h3>His voice</h3>
       <label class="field">Voice <select id="set-voice"></select></label>

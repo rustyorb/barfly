@@ -29,6 +29,21 @@ body {
   display: block;
 }
 
+#bar-caption {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  max-width: min(420px, calc(100vw - 380px));
+  margin: 0;
+  padding: 10px 14px;
+  color: #e5d5af;
+  background: #141a16e8;
+  border-left: 2px solid var(--amber);
+  box-shadow: 0 4px 18px #0004;
+  font: italic 16px/1.4 Georgia, serif;
+  pointer-events: none;
+}
+
 #loading {
   position: fixed;
   inset: 0;
@@ -402,6 +417,7 @@ button:focus-visible {
   #dock { left: 12px; bottom: 12px; width: calc(100vw - 24px); }
   #dock .row { gap: 8px; }
   #chat { max-height: 18dvh; }
+  #bar-caption { top: calc(27dvh + 28px); left: 12px; max-width: calc(100vw - 24px); font-size: 14px; }
   #settings { padding: 18px; }
   .field { grid-template-columns: 68px 1fr; }
 }

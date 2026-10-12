@@ -28,6 +28,8 @@ let info: ReadyInfo;
 let beer = 0;
 let tab = 0;
 let loomLeft = 0;
+let doorLoomLeft = 0;
+let loomSource: "door" | "hand" | "visitor" = "door";
 /** ms the door is held open for someone coming or going, without any looming signal */
 let doorHold = 0;
 let guestTalking = false;
@@ -45,6 +47,9 @@ let buzz = 0;
 let buzzStage = 0;
 const mouth = new Mouth(loadConfig());
 let talking = false;
+let captionLeft = 0;
+let captionIn = 16;
+let captionIndex = 0;
 /** what his body did lately, newest first, for the language model */
 const recent: string[] = [];
 
@@ -62,6 +67,13 @@ function log(text: string): void {
   recent.unshift(text);
   recent.length = Math.min(recent.length, 6);
   while ($("log").children.length > 12) $("log").lastElementChild!.remove();
+}
+
+function caption(text: string): void {
+  $("bar-caption").textContent = text;
+  $("bar-caption").hidden = false;
+  captionLeft = 6;
+  captionIn = 28 + Math.random() * 15;
 }
 
 function sendStep(): void {
@@ -108,6 +120,7 @@ function onFrame(frame: FrameResult): void {
   if (stage > buzzStage) log(stage === 2 ? "sloppy" : "getting buzzed");
   buzzStage = stage;
   loomLeft = Math.max(0, loomLeft - frame.frameMs);
+  doorLoomLeft = Math.max(0, doorLoomLeft - frame.frameMs);
 
   if (!drinking && proboscis > 0.5) {
     drinking = true;
@@ -119,6 +132,7 @@ function onFrame(frame: FrameResult): void {
   if (!flinching && startle > 0.5) {
     flinching = true;
     log("flinched");
+    caption(loomSource === "hand" ? "A beer delivery. Somehow also a threat." : "He meant to do that. Apparently.");
   } else if (flinching && startle < 0.15) flinching = false;
 
   if (budget >= FRAME_MS) sendStep();
@@ -139,7 +153,7 @@ function tick(now: number): void {
 
   // the door swings open fast and drifts shut
   doorHold = Math.max(0, doorHold - realDt);
-  const doorTarget = loomLeft > 0 || doorHold > 0 ? 1 : 0;
+  const doorTarget = doorLoomLeft > 0 || doorHold > 0 ? 1 : 0;
   door += (doorTarget - door) * (1 - Math.exp(-realDt / (doorTarget ? 60 : 900)));
 
   bar.render(realDt / 1000, { proboscis, startle, beer, door, tab, drunk: buzz, talking, guestTalking });
@@ -150,6 +164,15 @@ function tick(now: number): void {
   $("m-buzz").style.width = `${Math.round(buzz * 100)}%`;
   $("v-buzz").textContent = `${Math.round(buzz * 100)}%`;
   $("v-gaba").textContent = `x${gabaGain.toFixed(2)}`;
+  captionLeft = Math.max(0, captionLeft - realDt / 1000);
+  if (captionLeft === 0) $("bar-caption").hidden = true;
+  captionIn -= realDt / 1000;
+  if (captionIn <= 0 && !talking && !busy && !bar.serving) {
+    const notes = buzz > 0.7
+      ? ["He has reconsidered absolutely nothing.", "A distinguished scholar of one more.", "The stool is doing most of the work."]
+      : ["He has reconsidered absolutely nothing.", "His usual. His only. His entire afternoon.", "The tab is longer than his life plan.", "Reserved. Nobody was contesting it."];
+    caption(notes[captionIndex++ % notes.length]);
+  }
 }
 
 function line(who: "you" | "him" | "guest" | "oops", text: string): void {
@@ -177,10 +200,21 @@ async function strangerWalksIn(): Promise<void> {
   try {
     // the same looming signal as the Bang the door button, so his flinch at the newcomer is his own
     loomLeft = LOOM_MS;
+    doorLoomLeft = LOOM_MS;
+    loomSource = "visitor";
     doorHold = 3200;
     log(`door banged open: ${visitor.name} flew in`);
+    if (!mouth.model) {
+      await bar.guestArrive(visitor.tint);
+      log(`${visitor.name} landed, eventually`);
+      caption("A flawless landing. If you ignore the first attempt.");
+      await wait(6500);
+      return;
+    }
     // he thinks of his line on the way to the stool
     const [{ who, line: said }] = await Promise.all([mouth.walkIn(visitor), bar.guestArrive(visitor.tint)]);
+    log(`${visitor.name} landed, eventually`);
+    caption("A flawless landing. If you ignore the first attempt.");
     line("guest", `${who}: ${said}`);
     if (mouth.cfg.voice) {
       guestTalking = true;
@@ -207,7 +241,7 @@ function setUpMouth(): void {
   void setUpSettings(mouth.cfg);
 
   setInterval(() => {
-    if (!mouth.cfg.visitors || !mouth.model || busy || document.hidden) return;
+    if (!mouth.cfg.visitors || busy || document.hidden) return;
     strangerIn -= 1;
     if (strangerIn > 0) return;
     strangerIn = 90 + Math.random() * 120;
@@ -250,7 +284,19 @@ async function boot(): Promise<void> {
     $("loading-stage").textContent = `Something broke: ${msg}`;
   };
   brain.onFrame = onFrame;
-  bar.onDrag = () => log("took a drag");
+  bar.onDrag = () => {
+    log("took a drag");
+    if (Math.random() < 0.3) caption("He calls this a breathing exercise.");
+  };
+  bar.onCigaretteMishap = () => {
+    log("missed his mouth; checked the lit end");
+    caption("He knows which end is lit. In principle.");
+  };
+  bar.onBartenderLoom = () => {
+    loomLeft = Math.max(loomLeft, LOOM_MS);
+    loomSource = "hand";
+    log("bartender's hand loomed over the bar");
+  };
   info = await brain.init(new URL(import.meta.env.BASE_URL, location.href).href);
 
   const sugarN = info.groups.sugar_GRN_L.length + info.groups.sugar_GRN_R.length;
@@ -258,13 +304,13 @@ async function boot(): Promise<void> {
   $("fine").innerHTML =
     `Real wiring: ${info.neurons.toLocaleString()} neurons and ${info.connections.toLocaleString()} connections from the FlyWire v783 female fly brain, ` +
     `run with the Shiu et al. 2024 model. Bolted on: the beer is a ${SUGAR_HZ}/s signal sent straight to ${sugarN} sugar taste neurons; ` +
-    `the door is a ${LOOM_HZ}/s signal sent straight to ${loomN} looming detectors, not something he sees. ` +
+    `the door, a visiting fly and the bartender's approaching hand send a ${LOOM_HZ}/s signal straight to ${loomN} looming detectors, not something he sees. ` +
     `Made up: the buzz meter. Alcohol is chemistry and this map is only wiring, so we count the beer that went through his own mouth. ` +
     `The buzz does one thing to his brain: it strengthens every connection made by his ${info.gabaNeurons.toLocaleString()} GABA neurons, up to ${GABA_GAIN_AT_FULL_BUZZ} times. ` +
     `That is a cartoon of what alcohol does. What follows from it, the slower drinking and the duller flinch, is his wiring, not us. ` +
     `The sagging wings, lids and sway are animation tied to the same meter. ` +
     `His big eyes are a costume worn over his real compound eyes; the red in them is what is left of the real ones. ` +
-    `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. ` +
+    `The mug, the smokes, the stool and the bar are set dressing, and he smokes on a timer, not because his brain asked for one. His cigarette mistakes, the visitors' awkward landings and the occasional captions are theatrical jokes. The bartender's hand is animated, but his reaction to its looming signal comes from his escape neurons. ` +
     `Strangers who fly in are the same fly model with no brain behind it, flown along a set path, and their lines are written by the same language model; the door that announces them is the same looming signal, so his flinch at them is his own. ` +
     `His words come from the language model picked in Settings, which is told what his body just did; his voice is your browser's or a local voice server's. Neither one touches his brain. ` +
     `Brain engine and animation rig from <a href="https://github.com/dtecx/doodle-fly">dtecx/doodle-fly</a> (MIT). ` +
@@ -272,8 +318,10 @@ async function boot(): Promise<void> {
     `The wood material is <a href="https://polyhaven.com/a/wood_table">Wood Table by Dimitrios Savva / Poly Haven</a> (CC0). ` +
     `FlyWire data: CC BY-NC 4.0, Dorkenwald et al. and Schlegel et al., Nature 2024.`;
 
-  $("pour").addEventListener("click", () => {
-    if (beer > 0.02) return;
+  $("pour").addEventListener("click", async () => {
+    if (beer > 0.02 || bar.serving) return;
+    log("ordered a beer");
+    await bar.serveBeer();
     beer = 1;
     tab++;
     $("tab").textContent = String(tab);
@@ -282,7 +330,12 @@ async function boot(): Promise<void> {
   });
   $("door").addEventListener("click", () => {
     loomLeft = LOOM_MS;
+    doorLoomLeft = LOOM_MS;
+    loomSource = "door";
     log("door banged open");
+  });
+  $("company").addEventListener("click", () => {
+    if (!busy) void strangerWalksIn();
   });
 
   setUpMouth();

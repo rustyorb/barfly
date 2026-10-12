@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { FlyModel } from "./fly3d/fly.ts";
-import { dressRoom, labelTexture, woodMaterial } from "./bar-art.ts";
+import { bartenderHand, dressRegularCorner, dressRoom, labelTexture, woodMaterial } from "./bar-art.ts";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -47,6 +47,10 @@ const GUEST_HOVER = new THREE.Vector3(2.6, SEAT + 0.8, 0);
 const GUEST_YAW = 0.55;
 const GUEST_FLY_S = 2.4;
 const GUEST_SETTLE_S = 0.5;
+const GUEST_RECOVER_S = 1.7;
+const GUEST_MISS = new THREE.Vector3(1.75, SEAT + 0.5, -0.6);
+const SERVE_MUG_START = new THREE.Vector3(1.35, COUNTER + 0.85, -1.05);
+const MUG_REST = new THREE.Vector3(0, COUNTER, -0.72);
 
 function signTexture(): THREE.Texture {
   const c = document.createElement("canvas");
@@ -83,7 +87,10 @@ function receiptTexture(): THREE.Texture {
   g.fillStyle = "#efe6cf";
   g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = "#3a2c1c";
-  for (let y = 14; y < c.height; y += 18) g.fillRect(12, y, 30 + ((y * 37) % 70), 3);
+  g.font = "bold 18px Georgia";
+  g.textAlign = "center";
+  g.fillText("UNPAID", c.width / 2, 24);
+  for (let y = 44; y < c.height; y += 18) g.fillRect(12, y, 30 + ((y * 37) % 70), 3);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapT = THREE.RepeatWrapping;
@@ -157,6 +164,13 @@ export class BarScene {
   private readonly controls: OrbitControls;
   private readonly composer: EffectComposer;
   private readonly fly = new FlyModel();
+  private readonly mug = new THREE.Group();
+  private readonly bartender = bartenderHand();
+  private readonly spill: THREE.Group;
+  private bartenderT = -1;
+  private served: (() => void) | null = null;
+  private handLoomed = false;
+  onBartenderLoom: () => void = () => {};
   private readonly beer: THREE.Mesh;
   private readonly foam: THREE.Mesh;
   private readonly doorHinge = new THREE.Group();
@@ -176,11 +190,15 @@ export class BarScene {
   private smokeT = -1;
   private dragged = false;
   private exhaled = false;
+  private smokeFumble = false;
+  private fumbled = false;
+  onCigaretteMishap: () => void = () => {};
   /** whoever came in: a second fly, hidden until someone arrives */
   private readonly guest = new FlyModel();
   private readonly guestColors: { mat: THREE.MeshStandardMaterial; base: THREE.Color }[] = [];
   private guestPhase: "away" | "in" | "sit" | "out" = "away";
   private guestT = 0;
+  private guestFraming = 0;
   private guestLanded: (() => void) | null = null;
   private readonly restL: THREE.Vector3;
   private readonly restR: THREE.Vector3;
@@ -351,7 +369,7 @@ export class BarScene {
     this.scene.add(rimLight, rimLight.target);
 
     // the mug, under his mouth
-    const mug = new THREE.Group();
+    const mug = this.mug;
     const glass = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.19, MUG_H, 32, 1, true),
       new THREE.MeshPhysicalMaterial({ color: "#e8eee2", roughness: 0.08, transmission: 0.92, thickness: 0.035, ior: 1.48, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
@@ -373,16 +391,27 @@ export class BarScene {
     handle.position.set(0.2, MUG_H / 2, 0);
     handle.rotation.z = -Math.PI / 2;
     mug.add(glass, this.beer, this.foam, handle);
-    mug.position.set(0, COUNTER, -0.72);
+    mug.position.copy(MUG_REST);
     this.scene.add(mug);
-    const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.008, 40), new THREE.MeshStandardMaterial({ map: labelTexture("BARFLY", "ONE MORE"), color: "#c9ad7e", roughness: 1 }));
+    this.scene.add(this.bartender);
+    this.spill = dressRegularCorner(this.scene, COUNTER);
+    const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.008, 40), new THREE.MeshStandardMaterial({ map: labelTexture("BARFLY", "RESERVED SINCE FOREVER"), color: "#c9ad7e", roughness: 1 }));
     coaster.position.set(0, COUNTER + 0.004, -0.72);
     this.scene.add(coaster);
 
     // smokes: ashtray, a lit cigarette, the pack
     const dish = [new THREE.Vector2(0, 0.014), new THREE.Vector2(0.23, 0.014), new THREE.Vector2(0.29, 0.075), new THREE.Vector2(0.3, 0.08), new THREE.Vector2(0.29, 0), new THREE.Vector2(0, 0)];
     const ashtray = new THREE.Mesh(new THREE.LatheGeometry(dish, 40), new THREE.MeshStandardMaterial({ color: "#879286", roughness: 0.23, metalness: 0.65 }));
-    ashtray.position.set(-1.05, COUNTER + 0.04, -0.95);
+    ashtray.position.set(-1.05, COUNTER + 0.004, -0.95);
+    for (let i = 0; i < 28; i++) {
+      const angle = i * Math.PI * 2 / 28;
+      const crimp = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.065, 0.018), ashtray.material);
+      crimp.position.set(Math.sin(angle) * 0.29, 0.046, Math.cos(angle) * 0.29);
+      crimp.rotation.y = angle;
+      crimp.castShadow = true;
+      ashtray.add(crimp);
+    }
+    ashtray.castShadow = true;
     this.scene.add(ashtray);
     // the cigarette is one piece so he can pick it up: filter at -y, ember at +y
     const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.42, 10), new THREE.MeshStandardMaterial({ color: "#f3efe6", roughness: 0.8 }));
@@ -450,6 +479,52 @@ export class BarScene {
     window.addEventListener("resize", () => this.resize());
   }
 
+  get serving(): boolean {
+    return this.bartenderT >= 0;
+  }
+
+  serveBeer(): Promise<void> {
+    this.bartenderT = 0;
+    this.handLoomed = false;
+    this.bartender.visible = true;
+    this.mug.position.set(4.82, COUNTER + 1.96, -0.78);
+    return new Promise(resolve => { this.served = resolve; });
+  }
+
+  private updateBartender(dt: number): void {
+    if (this.bartenderT < 0) return;
+    this.bartenderT += dt;
+    const T = this.bartenderT;
+    const ease = (x: number) => {
+      const c = Math.min(1, Math.max(0, x));
+      return c * c * (3 - 2 * c);
+    };
+    const approach = ease(T / 1.1);
+    const place = ease((T - 0.8) / 0.9);
+    this.mug.position.lerpVectors(new THREE.Vector3(4.82, COUNTER + 1.96, -0.78), SERVE_MUG_START, approach).lerp(MUG_REST, place);
+    this.mug.rotation.z = 0.04 * Math.sin(T * 5) * (1 - place);
+    const grip = this.mug.position.clone().add(new THREE.Vector3(0.68, 0.34, 0.08));
+    this.bartender.position.copy(grip);
+    this.bartender.rotation.set(0.05, -0.1, -0.08 * (1 - place));
+    if (T > 0.75 && !this.handLoomed) {
+      this.handLoomed = true;
+      this.onBartenderLoom();
+    }
+    if (T >= 1.7 && this.served) {
+      this.served();
+      this.served = null;
+    }
+    const withdraw = ease((T - 2) / 1.2);
+    this.bartender.position.lerp(new THREE.Vector3(5.5, COUNTER + 2.8, -0.7), withdraw);
+    this.bartender.rotation.z -= 0.3 * withdraw;
+    if (T >= 3.2) {
+      this.bartenderT = -1;
+      this.bartender.visible = false;
+      this.mug.position.copy(MUG_REST);
+      this.mug.rotation.z = 0;
+    }
+  }
+
   /** Someone flies in through the door and lands on the next stool. Resolves once he has landed. */
   guestArrive(tint: string): Promise<void> {
     const t = new THREE.Color(tint);
@@ -490,24 +565,34 @@ export class BarScene {
     if (sitting) {
       root.position.copy(GUEST_SEAT);
       root.rotation.y = GUEST_YAW;
+      root.rotation.z = 0;
       wings = 0;
     } else if (this.guestPhase === "in") {
-      // fly the curve, then drop the last bit onto the seat and fold the wings
       const { at, toward } = along(smooth(this.guestT / GUEST_FLY_S));
-      const settle = smooth((this.guestT - GUEST_FLY_S) / GUEST_SETTLE_S);
+      const recovery = this.guestT - GUEST_FLY_S;
+      const settle = smooth((recovery - GUEST_RECOVER_S) / GUEST_SETTLE_S);
+      if (recovery > 0 && recovery < 0.55) {
+        at.lerpVectors(GUEST_HOVER, GUEST_MISS, smooth(recovery / 0.55));
+      } else if (recovery >= 0.55) {
+        const u = smooth((recovery - 0.55) / (GUEST_RECOVER_S - 0.55));
+        const loop = new THREE.Vector3(3.65, SEAT + 1.45, -0.75);
+        at.copy(GUEST_MISS).lerp(loop, u).lerp(loop.clone().lerp(GUEST_HOVER, u), u);
+      }
       at.y -= (GUEST_HOVER.y - GUEST_SEAT.y) * settle;
       at.y += 0.06 * Math.sin(this.t * 9) * (1 - settle);
       root.position.copy(at);
-      const turn = smooth((this.guestT - GUEST_FLY_S * 0.7) / (GUEST_FLY_S * 0.3 + GUEST_SETTLE_S));
+      const turn = smooth((this.guestT - GUEST_FLY_S * 0.7) / (GUEST_FLY_S * 0.3 + GUEST_RECOVER_S + GUEST_SETTLE_S));
       const heading = yawOf(toward);
       root.rotation.y = heading + (GUEST_YAW - heading) * turn;
+      root.rotation.z = 0.35 * Math.sin(Math.PI * Math.min(1, Math.max(0, recovery) / GUEST_RECOVER_S)) * (1 - settle);
       wings = 1 - settle;
-      if (this.guestT >= GUEST_FLY_S + GUEST_SETTLE_S) {
+      if (this.guestT >= GUEST_FLY_S + GUEST_RECOVER_S + GUEST_SETTLE_S) {
         this.guestPhase = "sit";
         this.guestLanded?.();
         this.guestLanded = null;
       }
     } else {
+      root.rotation.z = 0;
       // lift off the stool, then fly the same curve back to the door
       const lift = smooth(this.guestT / GUEST_SETTLE_S);
       const { at, toward } = along(1 - smooth((this.guestT - GUEST_SETTLE_S) / GUEST_FLY_S));
@@ -559,8 +644,10 @@ export class BarScene {
 
   render(dt: number, s: BarState): void {
     this.t += dt;
+    this.updateBartender(dt);
+    this.spill.scale.set(1 + Math.min(0.45, s.tab * 0.035), 1, 1 + Math.min(0.25, s.tab * 0.02));
 
-    const level = Math.max(0, Math.min(1, s.beer));
+    const level = this.served ? 1 : Math.max(0, Math.min(1, s.beer));
     this.beer.scale.y = Math.max(0.001, level);
     this.beer.visible = level > 0.005;
     this.foam.visible = level > 0.02;
@@ -582,12 +669,15 @@ export class BarScene {
       if (this.smokeIn <= 0 && idle) {
         this.smokeT = 0;
         this.dragged = this.exhaled = false;
+        this.smokeFumble = s.drunk > 0.25 && Math.random() < 0.3 + 0.6 * s.drunk;
+        this.fumbled = false;
       }
     } else {
       this.smokeT += dt;
       // a flinch makes him put it straight back down
-      if (s.startle > 0.4 && this.smokeT < 3.2) this.smokeT = this.smokeT < 0.8 ? 4.2 : 3.2;
-      if (this.smokeT >= 5) {
+      const putDown = this.smokeFumble ? 5.8 : 3.2;
+      if (s.startle > 0.4 && this.smokeT < putDown) this.smokeT = this.smokeT < 0.8 ? putDown + 1 : putDown;
+      if (this.smokeT >= (this.smokeFumble ? 7.6 : 5)) {
         this.smokeT = -1;
         this.smokeIn = (20 + Math.random() * 25) * (1 - 0.35 * s.drunk);
       }
@@ -597,17 +687,28 @@ export class BarScene {
       const c = Math.min(1, Math.max(0, x));
       return c * c * (3 - 2 * c);
     };
-    const reach = T < 0 ? 0 : ease(T / 0.8) * (1 - ease((T - 4.2) / 0.8)); // his foot is on the cigarette
-    const lift = T < 0 ? 0 : ease((T - 0.8) / 1.0) * (1 - ease((T - 3.2) / 1.0)); // the cigarette is at his mouth
-    const drag = T < 0 ? 0 : ease((T - 1.9) / 0.3) * (1 - ease((T - 2.9) / 0.3));
-    if (T > 1.9 && T < 3.2 && !this.dragged) {
+    const putDown = this.smokeFumble ? 5.8 : 3.2;
+    const dragAt = this.smokeFumble ? 4.5 : 1.9;
+    const reach = T < 0 ? 0 : ease(T / 0.8) * (1 - ease((T - putDown - 1) / 0.8));
+    const lift = T < 0 ? 0 : ease((T - 0.8) / 1.0) * (1 - ease((T - putDown) / 1.0));
+    const drag = T < 0 ? 0 : ease((T - dragAt) / 0.3) * (1 - ease((T - dragAt - 1) / 0.3));
+    const miss = this.smokeFumble && T >= 0 ? ease((T - 1.7) / 0.25) * (1 - ease((T - 2.35) / 0.3)) : 0;
+    const inspect = this.smokeFumble && T >= 0 ? ease((T - 2.35) / 0.35) * (1 - ease((T - 3.5) / 0.4)) : 0;
+    if (T > 1.8 && T < 2.4 && this.smokeFumble && !this.fumbled) {
+      this.fumbled = true;
+      this.onCigaretteMishap();
+    }
+    if (T > dragAt && T < putDown && !this.dragged) {
       this.dragged = true;
       this.onDrag();
     }
 
     this.cig.position.lerpVectors(CIG_REST, CIG_AT_MOUTH, lift);
     this.cig.position.y += Math.sin(Math.PI * lift) * 0.15;
-    this.cig.rotation.z = CIG_REST_TILT + (Math.PI / 2 - CIG_REST_TILT) * lift;
+    this.cig.position.x -= miss * 0.2 + inspect * 0.28;
+    this.cig.position.y -= miss * 0.18 + inspect * 0.1;
+    this.cig.position.z -= inspect * 0.12;
+    this.cig.rotation.z = CIG_REST_TILT + (Math.PI / 2 - CIG_REST_TILT) * lift + Math.PI * inspect + 0.18 * miss;
     this.cig.updateMatrixWorld(true);
     this.ember.scale.setScalar(1 + 1.4 * drag);
     (this.ember.material as THREE.MeshBasicMaterial).color.setRGB(1, 0.42 + 0.4 * drag, 0.12 + 0.3 * drag);
@@ -617,7 +718,7 @@ export class BarScene {
     grip.y -= 0.02;
     const hand = this.restL.clone().lerp(grip, reach);
 
-    if (T > 3.5 && !this.exhaled && this.dragged) {
+    if (T > putDown + 0.3 && !this.exhaled && this.dragged) {
       this.exhaled = true;
       this.puffs.forEach((p, i) => {
         p.age = -i * 0.035;
@@ -666,13 +767,21 @@ export class BarScene {
       startle: s.startle,
       buzz: s.startle * 0.5,
       // he glances at the ashtray as he reaches for it
-      lookX: -0.6 * reach * (1 - 0.7 * lift),
+      lookX: -0.6 * reach * (1 - 0.7 * lift) - 0.5 * inspect,
       bob: s.talking ? 0.5 + 0.5 * Math.sin(this.t * 13) : 0,
       drunk: s.drunk,
     });
 
     this.updateGuest(dt, s.guestTalking);
 
+    const compact = this.canvas.clientWidth <= 700;
+    this.guestFraming += ((compact && this.guest.root.visible ? 1 : 0) - this.guestFraming) * (1 - Math.exp(-dt / 0.4));
+    const fov = compact ? 38 + 20 * this.guestFraming : 34;
+    if (Math.abs(this.camera.fov - fov) > 0.001) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+    this.controls.target.x = 0.9 + 1.2 * this.guestFraming;
     this.controls.update();
     this.composer.render(dt);
   }
